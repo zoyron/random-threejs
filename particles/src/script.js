@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import GUI from "lil-gui";
-import heightNormal from "../static/textures/heightNormal.png";
 
 /**
  * Base
@@ -14,36 +13,32 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0.005, 0.005, 0.009);
-
-// Light
-// scene.add(new THREE.AmbientLight());
-const pointLight = new THREE.PointLight(0x00ff00, 100, 0);
-pointLight.position.set(3, 3, 0);
-scene.add(pointLight);
-const pointLight1 = new THREE.PointLight(0xff0000, 50, 0);
-pointLight1.position.set(-3, 0, 3);
 
 /**
  * Textures
  */
 const textureLoader = new THREE.TextureLoader();
-const normalTexture = textureLoader.load(heightNormal);
 
 /**
- * Test sphere
+ * Particles
  */
-const sphere = new THREE.Mesh(
-  new THREE.SphereGeometry(1, 32, 32),
-  new THREE.MeshStandardMaterial({
-    // wireframe: true,
-    metalness: 0.7,
-    roughness: 0.2,
-    normalMap: normalTexture,
-    color: 0x000000,
-  })
+const count = 5000;
+const positions = new Float32Array(count * 3);
+for (let i = 0; i < count * 3; i++) {
+  positions[i] = (Math.random() - 0.5) * 10;
+}
+const particleGeometry = new THREE.BufferGeometry();
+particleGeometry.setAttribute(
+  "position",
+  new THREE.BufferAttribute(positions, 3)
 );
-scene.add(sphere);
+const particleMaterial = new THREE.PointsMaterial({
+  color: "red",
+  size: 0.02,
+  sizeAttenuation: true,
+});
+const pointsMesh = new THREE.Points(particleGeometry, particleMaterial);
+scene.add(pointsMesh);
 
 /**
  * Sizes
@@ -77,11 +72,8 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   100
 );
-camera.position.x = 3;
-camera.position.y = 3;
 camera.position.z = 3;
 scene.add(camera);
-scene.add(pointLight1);
 
 // Controls
 const controls = new OrbitControls(camera, canvas);
@@ -101,8 +93,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
  */
 const clock = new THREE.Clock();
 
-const animate = () => {
-  sphere.rotation.y += 0.0215;
+const tick = () => {
   const elapsedTime = clock.getElapsedTime();
 
   // Update controls
@@ -111,8 +102,8 @@ const animate = () => {
   // Render
   renderer.render(scene, camera);
 
-  // Call animate again on the next frame
-  window.requestAnimationFrame(animate);
+  // Call tick again on the next frame
+  window.requestAnimationFrame(tick);
 };
 
-animate();
+tick();
