@@ -1,4 +1,4 @@
-# Experimenting with random threejs based animations and visualizations for fun.
+# Random threejs experiments
 
 ## Install and run
 
