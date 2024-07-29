@@ -18,6 +18,9 @@ const scene = new THREE.Scene();
  * Textures
  */
 const textureLoader = new THREE.TextureLoader();
+const particleTexture = textureLoader.load("/textures/particles/11.png");
+const sunTexture = textureLoader.load("/textures/sun.jpg");
+const mercuryTexture = textureLoader.load("/textures/merc.webp");
 
 /**
  * Particles
@@ -33,12 +36,36 @@ particleGeometry.setAttribute(
   new THREE.BufferAttribute(positions, 3)
 );
 const particleMaterial = new THREE.PointsMaterial({
-  color: "red",
-  size: 0.02,
+  color: "#D3D3D3",
+  size: 0.0275,
   sizeAttenuation: true,
+  transparent: true,
+  alphaMap: particleTexture,
+  alphaTest: 0.001,
 });
 const pointsMesh = new THREE.Points(particleGeometry, particleMaterial);
 scene.add(pointsMesh);
+
+/**
+ * the sun
+ */
+const group = new THREE.Group();
+const sunMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.75, 32, 32),
+  new THREE.MeshBasicMaterial({ map: sunTexture })
+);
+group.add(sunMesh);
+
+/**
+ * mercury
+ */
+const mercuryMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.25, 32, 32),
+  new THREE.MeshBasicMaterial({ color: "0x0080ff", map: mercuryTexture })
+);
+mercuryMesh.position.set(2, 0.0025, 0);
+group.add(mercuryMesh);
+scene.add(group);
 
 /**
  * Sizes
@@ -72,7 +99,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   100
 );
-camera.position.z = 3;
+camera.position.set(0, 5, 5);
 scene.add(camera);
 
 // Controls
@@ -96,6 +123,11 @@ const clock = new THREE.Clock();
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
 
+  pointsMesh.rotation.y += 0.00025;
+  sunMesh.rotation.y -= 0.0025;
+  mercuryMesh.rotation.y -= 0.025;
+  mercuryMesh.position.z = -Math.sin(elapsedTime) * 2;
+  mercuryMesh.position.x = Math.cos(elapsedTime) * 2;
   // Update controls
   controls.update();
 
