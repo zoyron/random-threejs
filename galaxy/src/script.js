@@ -53,14 +53,42 @@ window.addEventListener("resize", () => {
 
 /**
  * adding objects
+ * Generating galaxy in this experiment
  */
 
-// adding a sphere
-const sphereMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(0.75, 32, 32),
-  new THREE.MeshBasicMaterial()
-);
-scene.add(sphereMesh);
+const galaxyParameters = {};
+galaxyParameters.count = 1000;
+galaxyParameters.size = 0.02;
+// generate galaxy function
+function generateGalaxy() {
+  const galaxyGeometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(galaxyParameters.count * 3);
+  for (let i = 0; i < galaxyParameters.count; i++) {
+    let i3 = i * 3;
+    positions[i3 + 0] = (Math.random() - 0.5) * 3;
+    positions[i3 + 1] = (Math.random() - 0.5) * 3;
+    positions[i3 + 2] = (Math.random() - 0.5) * 3;
+  }
+
+  // setting the position attribute using the positions array
+  galaxyGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(positions, 3)
+  );
+
+  // Material
+  const galaxyMaterial = new THREE.PointsMaterial({
+    size: galaxyParameters.size,
+    sizeAttenuation: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  // Points mesh
+  const galaxyPoints = new THREE.Points(galaxyGeometry, galaxyMaterial);
+  scene.add(galaxyPoints);
+}
+generateGalaxy();
 
 /**
  * animate and orbit controls
