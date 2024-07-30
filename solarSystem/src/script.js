@@ -11,8 +11,9 @@ const gui = new GUI();
 // Canvas
 const canvas = document.querySelector("canvas.webgl");
 
-// Scene
+// Scene and light
 const scene = new THREE.Scene();
+scene.add(new THREE.AmbientLight(0xffffff, 2.5));
 
 /**
  * Textures
@@ -61,7 +62,7 @@ group.add(sunMesh);
  */
 const mercuryMesh = new THREE.Mesh(
   new THREE.SphereGeometry(0.25, 32, 32),
-  new THREE.MeshBasicMaterial({ color: "0x0080ff", map: mercuryTexture })
+  new THREE.MeshStandardMaterial({ map: mercuryTexture })
 );
 mercuryMesh.position.set(2, 0.0025, 0);
 group.add(mercuryMesh);
