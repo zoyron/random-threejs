@@ -24,17 +24,34 @@ const textureLoader = new THREE.TextureLoader();
 /**
  * Test mesh
  */
+
+// texture
+const flagTexture = textureLoader.load("/textures/indianFlag.png");
+
 // Geometry
-const geometry = new THREE.PlaneGeometry(0.5, 0.5, 32, 32);
+const geometry = new THREE.PlaneGeometry(0.75, 0.75, 32, 32);
+const count = geometry.attributes.position.count;
+const randoms = new Float32Array(count);
+for (let i = 0; i < count; i++) {
+  randoms[i] = Math.random();
+}
+geometry.setAttribute("aRandom", new THREE.BufferAttribute(randoms, 1));
 
 // Material
 const material = new THREE.RawShaderMaterial({
+  //   wireframe: true,
   vertexShader: vertexShader,
   fragmentShader: fragmentShader,
+  uniforms: {
+    uFrequency: { value: new THREE.Vector2(10, 5) },
+    uTime: { value: 0 },
+    uTexture: { value: flagTexture },
+  },
 });
 
 // Mesh
 const mesh = new THREE.Mesh(geometry, material);
+mesh.scale.y = 0.66;
 scene.add(mesh);
 
 /**
@@ -90,8 +107,11 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
  */
 const clock = new THREE.Clock();
 
-const tick = () => {
+const animate = () => {
   const elapsedTime = clock.getElapsedTime();
+
+  // update the uTime in material
+  material.uniforms.uTime.value = elapsedTime;
 
   // Update controls
   controls.update();
@@ -99,8 +119,8 @@ const tick = () => {
   // Render
   renderer.render(scene, camera);
 
-  // Call tick again on the next frame
-  window.requestAnimationFrame(tick);
+  // Call animate again on the next frame
+  window.requestAnimationFrame(animate);
 };
 
-tick();
+animate();
