@@ -40,6 +40,7 @@ geometry.setAttribute("aRandom", new THREE.BufferAttribute(randoms, 1));
 // Material
 const material = new THREE.RawShaderMaterial({
   //   wireframe: true,
+  side: THREE.DoubleSide,
   vertexShader: vertexShader,
   fragmentShader: fragmentShader,
   uniforms: {
