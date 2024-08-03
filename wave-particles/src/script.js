@@ -29,33 +29,34 @@ oceanTexture.colorSpace = THREE.SRGBColorSpace;
  * Geometry, material and mesh
  */
 // simple mesh, no points
-// const geometry = new THREE.PlaneGeometry(10, 10, 150, 150).rotateX(
-//   -Math.PI / 2
-// );
-// const material = new THREE.MeshMatcapMaterial({
-//   matcap: matcapTexture,
-//   side: THREE.DoubleSide,
-// });
-// const plane = new THREE.Mesh(geometry, material);
-
-// Points and points material
 const geometry = new THREE.PlaneGeometry(10, 10, 150, 150).rotateX(
   -Math.PI / 2
 );
-const material = new THREE.PointsMaterial({
-  size: 0.0005,
-  map: oceanTexture,
-  transparent: true,
-  blending: THREE.AdditiveBlending,
-  depthWrite: false,
-  depthTest: true, // Adjust based on your needs
-  opacity: 0.7,
-  // alphaTest: 0.01,
+const material = new THREE.MeshMatcapMaterial({
+  matcap: matcapTexture,
   side: THREE.DoubleSide,
 });
-
 material.color.setHSL(0.6, 1, 0.5); // Adjust as needed
-const plane = new THREE.Points(geometry, material);
+const plane = new THREE.Mesh(geometry, material);
+
+// Points and points material
+// const geometry = new THREE.PlaneGeometry(10, 10, 150, 150).rotateX(
+//   -Math.PI / 2
+// );
+// const material = new THREE.PointsMaterial({
+//   size: 0.0005,
+//   map: oceanTexture,
+//   transparent: true,
+//   blending: THREE.AdditiveBlending,
+//   depthWrite: false,
+//   depthTest: true, // Adjust based on your needs
+//   opacity: 0.7,
+//   // alphaTest: 0.01,
+//   side: THREE.DoubleSide,
+// });
+
+// material.color.setHSL(0.6, 1, 0.5); // Adjust as needed
+// const plane = new THREE.Points(geometry, material);
 scene.add(plane);
 console.log(plane.position);
 camera.position.set(0, 7.5, 5);
