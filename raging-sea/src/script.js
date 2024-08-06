@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import GUI from "lil-gui";
+import vertexShader from "./shaders/water/vertex.glsl";
+import fragmentShader from "./shaders/water/fragment.glsl";
 
 /**
  * Base
  */
 // Debug
-const gui = new GUI({ width: 340 });
+const gui = new GUI();
 
 // Canvas
 const canvas = document.querySelector("canvas.webgl");
@@ -18,15 +20,32 @@ const scene = new THREE.Scene();
  * Water
  */
 // Geometry
-const waterGeometry = new THREE.PlaneGeometry(2, 2, 128, 128);
+const waterGeometry = new THREE.PlaneGeometry(1.5, 1.5, 128, 128);
 
 // Material
-const waterMaterial = new THREE.ShaderMaterial();
+const waterMaterial = new THREE.ShaderMaterial({
+  side: THREE.DoubleSide,
+  vertexShader: vertexShader,
+  fragmentShader: fragmentShader,
+  uniforms: {
+    uElevation: { value: 0.025 },
+  },
+});
 
 // Mesh
 const water = new THREE.Mesh(waterGeometry, waterMaterial);
 water.rotation.x = -Math.PI * 0.5;
 scene.add(water);
+
+/**
+ * Gui debug
+ */
+gui
+  .add(waterMaterial.uniforms.uElevation, "value")
+  .min(0)
+  .max(1)
+  .step(0.001)
+  .name("wave elevation");
 
 /**
  * Sizes
@@ -61,6 +80,7 @@ const camera = new THREE.PerspectiveCamera(
   100
 );
 camera.position.set(1, 1, 1);
+// camera.lookAt(water.position);
 scene.add(camera);
 
 // Controls
