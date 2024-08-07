@@ -34,7 +34,7 @@ for (let i = 0; i < count * 3; i++) {
 const particleGeometry = new THREE.BufferGeometry();
 particleGeometry.setAttribute(
   "position",
-  new THREE.BufferAttribute(positions, 3)
+  new THREE.BufferAttribute(positions, 3),
 );
 const particleMaterial = new THREE.PointsMaterial({
   color: "#D3D3D3",
@@ -53,7 +53,7 @@ scene.add(pointsMesh);
 const group = new THREE.Group();
 const sunMesh = new THREE.Mesh(
   new THREE.SphereGeometry(0.75, 32, 32),
-  new THREE.MeshBasicMaterial({ map: sunTexture })
+  new THREE.MeshBasicMaterial({ map: sunTexture }),
 );
 group.add(sunMesh);
 
@@ -62,7 +62,7 @@ group.add(sunMesh);
  */
 const mercuryMesh = new THREE.Mesh(
   new THREE.SphereGeometry(0.25, 32, 32),
-  new THREE.MeshStandardMaterial({ map: mercuryTexture })
+  new THREE.MeshStandardMaterial({ map: mercuryTexture }),
 );
 mercuryMesh.position.set(2, 0.0025, 0);
 group.add(mercuryMesh);
@@ -94,12 +94,7 @@ window.addEventListener("resize", () => {
  * Camera
  */
 // Base camera
-const camera = new THREE.PerspectiveCamera(
-  75,
-  sizes.width / sizes.height,
-  0.1,
-  100
-);
+const camera = new THREE.PerspectiveCamera(45, sizes.width / sizes.height, 0.1, 1000);
 camera.position.set(0, 5, 5);
 scene.add(camera);
 
