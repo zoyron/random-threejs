@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import GUI from "lil-gui";
+import { GLTFLoader } from "three/examples/jsm/Addons.js";
 
 /**
  * Base
@@ -15,15 +16,47 @@ const canvas = document.querySelector("canvas.webgl");
 const scene = new THREE.Scene();
 
 /**
+ * Loader and Models
+ */
+
+// loader
+let mixer = null;
+const gltfLoader = new GLTFLoader();
+gltfLoader.load("/models/Fox/glTF/Fox.gltf", (gltf) => {
+  mixer = new THREE.AnimationMixer(gltf.scene);
+  const action = mixer.clipAction(gltf.animations[2]);
+  action.play();
+
+  gltf.scene.scale.set(0.035, 0.035, 0.035);
+
+  // Traverse the model and set wireframe to true for all materials
+  gltf.scene.traverse((child) => {
+    if (child.isMesh) {
+      if (Array.isArray(child.material)) {
+        child.material.forEach((material) => {
+          material.wireframe = true;
+        });
+      } else {
+        child.material.wireframe = true;
+      }
+    }
+  });
+
+  scene.add(gltf.scene);
+  console.log(gltf);
+});
+
+/**
  * Floor
  */
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(10, 10),
+  new THREE.CircleGeometry(5, 32),
   new THREE.MeshStandardMaterial({
-    color: "#444444",
-    metalness: 0,
-    roughness: 0.5,
-  }),
+    side: THREE.DoubleSide,
+    color: "#004090",
+    metalness: 0.5,
+    roughness: 0.3,
+  })
 );
 floor.receiveShadow = true;
 floor.rotation.x = -Math.PI * 0.5;
@@ -76,9 +109,9 @@ const camera = new THREE.PerspectiveCamera(
   75,
   sizes.width / sizes.height,
   0.1,
-  100,
+  100
 );
-camera.position.set(2, 2, 2);
+camera.position.set(7, 7, 7);
 scene.add(camera);
 
 // Controls
@@ -110,6 +143,11 @@ const animate = () => {
 
   // Update controls
   controls.update();
+
+  // Update mixer
+  if (mixer !== null) {
+    mixer.update(deltaTime);
+  }
 
   // Render
   renderer.render(scene, camera);
