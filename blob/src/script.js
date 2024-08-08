@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import vertex from "../shaders/vertex.glsl";
+import fragment from "../shaders/fragment.glsl";
 
 /**
  * Base setup
@@ -20,7 +22,6 @@ const sizes = {
 /**
  * Camera
  */
-
 // Perspective Camera
 const camera = new THREE.PerspectiveCamera(
   75,
@@ -34,8 +35,16 @@ scene.add(camera);
 /**
  * Adding a base mesh
  */
-const geometry = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
-const material = new THREE.MeshNormalMaterial();
+const geometry = new THREE.IcosahedronGeometry(2, 15);
+const material = new THREE.ShaderMaterial({
+  wireframe: true,
+  vertexShader: vertex,
+  fragmentShader: fragment,
+  uniforms: {
+    uResolution: { value: new THREE.Vector2(sizes.width, sizes.height) },
+    uTime: { value: 0 },
+  },
+});
 const mesh = new THREE.Mesh(geometry, material);
 scene.add(mesh);
 
@@ -75,9 +84,11 @@ controls.enableDamping = true;
 
 // Animate
 const animate = () => {
+  // update time uniform
+  material.uniforms.uTime.value += 0.0125;
+
   // Rotate mesh
-  mesh.rotation.x += 0.0125;
-  mesh.rotation.y += 0.0125;
+  mesh.rotation.y += 0.005;
 
   // Update controls
   controls.update();
