@@ -36,7 +36,6 @@ scene.add(camera);
  * Adding a base mesh
  */
 const geometry = new THREE.IcosahedronGeometry(2, 25);
-// const geometry = new THREE.BoxGeometry(3, 3, 3, 60, 60, 60);
 const material = new THREE.ShaderMaterial({
   wireframe: true,
   vertexShader: vertex,
@@ -89,6 +88,7 @@ const animate = () => {
   material.uniforms.uTime.value += 0.0125;
 
   // Rotate mesh
+  mesh.rotation.x += 0.005;
   mesh.rotation.y += 0.005;
 
   // Update controls
