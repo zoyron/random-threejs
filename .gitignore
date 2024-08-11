@@ -25,3 +25,6 @@ dist-ssr
 
 # Zip files
 *.zip
+
+# Temporary files
+temp.js
