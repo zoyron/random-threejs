@@ -10,7 +10,7 @@ const vec = new THREE.Vector3();
 const dir = new THREE.Vector3();
 
 const gap = 0.1;
-const stride = 5;
+const stride = 4;
 const displacement = 3;
 const intensity = 1;
 
@@ -22,7 +22,7 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color("#151520");
+// scene.background = new THREE.Color("#151520");
 
 // Sizes
 const sizes = {
@@ -82,21 +82,6 @@ for (let x = 0; x < stride; x++) {
 }
 
 /**
- *
- */
-// Mouse move
-window.addEventListener("mousemove", (event) => {
-  const mouse = new THREE.Vector2();
-  mouse.x = (event.clientX / sizes.width) * 2 - 1;
-  // Change this line
-  mouse.y = -(event.clientY / sizes.height) * 2 + 1;
-
-  cursor.set(mouse.x, mouse.y, 0.5).unproject(camera);
-  dir.copy(cursor).sub(camera.position).normalize();
-  cursor.add(dir.multiplyScalar(camera.position.length()));
-});
-
-/**
  * Renderer and Resizing
  */
 // renderer
@@ -122,6 +107,20 @@ window.addEventListener("resize", () => {
 });
 
 /**
+ * Mouse event listener
+ */
+window.addEventListener("mousemove", (event) => {
+  const mouse = new THREE.Vector2();
+
+  mouse.x = (event.clientX / sizes.width) * 2 - 1;
+  mouse.y = -(event.clientY / sizes.height) * 2 + 1;
+
+  cursor.set(mouse.x, mouse.y, 0.5).unproject(camera);
+  dir.copy(cursor).sub(camera.position).normalize();
+  cursor.add(dir.multiplyScalar(camera.position.length()));
+});
+
+/**
  * Animate and controls
  */
 // Controls
@@ -138,6 +137,12 @@ function animate() {
     const dist = oPos.distanceTo(cursor);
     const distInv = displacement - dist;
     const col = Math.max(0.5, distInv) / 1.5;
+    if (dist > displacement) {
+      cube.position.lerp(oPos, 0.2);
+    } else {
+      vec.copy(oPos).add(dir.multiplyScalar(distInv * intensity));
+      cube.position.lerp(vec, 0.2);
+    }
   });
   renderer.render(scene, camera);
 }
