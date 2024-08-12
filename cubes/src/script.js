@@ -10,7 +10,7 @@ const vec = new THREE.Vector3();
 const dir = new THREE.Vector3();
 
 const gap = 0.1;
-const stride = 4;
+const stride = 5;
 const displacement = 3;
 const intensity = 1;
 
@@ -22,7 +22,7 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color("#151520");
+// scene.background = new THREE.Color("#151520");
 
 // Sizes
 const sizes = {
@@ -44,7 +44,7 @@ camera.position.set(5, 5, 5);
 scene.add(camera);
 
 // Ambient Light
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+const ambientLight = new THREE.AmbientLight(0xaaaaaa, 1.5);
 scene.add(ambientLight);
 
 // Spotlight
@@ -141,7 +141,7 @@ function animate() {
     if (dist > displacement * 1.1) {
       cube.material.color.lerp(new THREE.Color("white"), 0.1);
     } else {
-      cube.material.color.lerp(new THREE.Color(col / 2, col * 2, col * 4), 0.1);
+      cube.material.color.lerp(new THREE.Color(col / 2, col * 2, col * 4), 0.2);
     }
     if (dist > displacement) {
       cube.position.lerp(oPos, 0.2);
