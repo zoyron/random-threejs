@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import getStarField from "./getStarField";
 
 /**
  * Base setup
@@ -16,8 +17,11 @@ const sizes = {
   height: window.innerHeight,
 };
 
+// Creating a group
+const group = new THREE.Group();
+scene.add(group);
 /**
- * Camera
+ * Camera and textures
  */
 // Perspective Camera
 const camera = new THREE.PerspectiveCamera(
@@ -29,13 +33,28 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.set(3, 3, 3);
 scene.add(camera);
 
+// Texture loader
+const textureLoader = new THREE.TextureLoader();
+const starTexture = textureLoader.load("/circle.png");
+
 /**
  * Adding a base mesh
  */
-const geometry = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
+const geometry = new THREE.BoxGeometry(1, 1, 1);
 const material = new THREE.MeshNormalMaterial();
 const mesh = new THREE.Mesh(geometry, material);
-scene.add(mesh);
+group.add(mesh);
+
+// points mesh
+const pointsMaterial = new THREE.PointsMaterial({
+  size: 0.2,
+});
+const pointsMesh = new THREE.Points(geometry, pointsMaterial);
+group.add(pointsMesh);
+
+// adding the star field
+const stars = getStarField({ numStars: 4500, sprite: starTexture });
+scene.add(stars);
 
 /**
  * Renderer and Resizing
@@ -72,8 +91,8 @@ controls.enableDamping = true;
 // Animate
 const animate = () => {
   // Rotate mesh
-  mesh.rotation.x += 0.0125;
-  mesh.rotation.y += 0.0125;
+  group.rotation.x += 0.0125;
+  group.rotation.y += 0.0125;
 
   // Update controls
   controls.update();
