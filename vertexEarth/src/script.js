@@ -39,23 +39,23 @@ scene.add(camera);
 const textureLoader = new THREE.TextureLoader();
 const starTexture = textureLoader.load("/circle.png");
 const colorMap = textureLoader.load("/earthmap1k.jpg");
+const elevationMap = textureLoader.load("/earthbump1k.jpg");
+const alphaMap = textureLoader.load("/earthspec1k.jpg");
 
 /**
  * Adding a base mesh
  */
-const geometry = new THREE.IcosahedronGeometry(1.5, 10);
-const material = new THREE.MeshBasicMaterial({
-  color: 0x202020,
-  wireframe: true,
-  transparent: true,
-  opacity: 0.25,
-});
-const mesh = new THREE.Mesh(geometry, material);
-group.add(mesh);
+// const geometry = new THREE.IcosahedronGeometry(2, 10);
+// const material = new THREE.MeshBasicMaterial({
+//   color: 0x202020,
+//   wireframe: true,
+// });
+// const mesh = new THREE.Mesh(geometry, material);
+// group.add(mesh);
 
 // points mesh
-const vert = 80;
-const pointsGeometry = new THREE.IcosahedronGeometry(1.5, vert);
+const vert = 500;
+const pointsGeometry = new THREE.SphereGeometry(3, vert, vert, vert);
 // const pointsMaterial = new THREE.PointsMaterial({
 //   size: 0.03,
 //   map: colorMap,
@@ -65,8 +65,10 @@ const pointsGeometry = new THREE.IcosahedronGeometry(1.5, vert);
 const pointsMaterial = new THREE.ShaderMaterial({
   transparent: true,
   uniforms: {
-    uSize: { value: 2.0 },
-    uColormap: { value: colorMap },
+    uSize: { value: 3.0 },
+    uColorMap: { value: colorMap },
+    uElevationMap: { value: elevationMap },
+    uAlphaMap: { value: alphaMap },
   },
   vertexShader: vertexShader,
   fragmentShader: fragmentShader,
