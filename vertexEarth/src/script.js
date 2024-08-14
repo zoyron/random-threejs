@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import getStarField from "./getStarField";
+import vertexShader from "./shaders/vertex.glsl";
+import fragmentShader from "./shaders/fragment.glsl";
 
 /**
  * Base setup
@@ -36,20 +38,40 @@ scene.add(camera);
 // Texture loader
 const textureLoader = new THREE.TextureLoader();
 const starTexture = textureLoader.load("/circle.png");
+const colorMap = textureLoader.load("/earthmap1k.jpg");
 
 /**
  * Adding a base mesh
  */
-const geometry = new THREE.BoxGeometry(1, 1, 1);
-const material = new THREE.MeshNormalMaterial();
+const geometry = new THREE.IcosahedronGeometry(1.5, 10);
+const material = new THREE.MeshBasicMaterial({
+  color: 0x202020,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.25,
+});
 const mesh = new THREE.Mesh(geometry, material);
 group.add(mesh);
 
 // points mesh
-const pointsMaterial = new THREE.PointsMaterial({
-  size: 0.2,
+const vert = 80;
+const pointsGeometry = new THREE.IcosahedronGeometry(1.5, vert);
+// const pointsMaterial = new THREE.PointsMaterial({
+//   size: 0.03,
+//   map: colorMap,
+// });
+
+// Shader material
+const pointsMaterial = new THREE.ShaderMaterial({
+  transparent: true,
+  uniforms: {
+    uSize: { value: 2.0 },
+    uColormap: { value: colorMap },
+  },
+  vertexShader: vertexShader,
+  fragmentShader: fragmentShader,
 });
-const pointsMesh = new THREE.Points(geometry, pointsMaterial);
+const pointsMesh = new THREE.Points(pointsGeometry, pointsMaterial);
 group.add(pointsMesh);
 
 // adding the star field
@@ -91,8 +113,8 @@ controls.enableDamping = true;
 // Animate
 const animate = () => {
   // Rotate mesh
-  group.rotation.x += 0.0125;
-  group.rotation.y += 0.0125;
+  // group.rotation.x += 0.0125;
+  group.rotation.y += 0.0025;
 
   // Update controls
   controls.update();
