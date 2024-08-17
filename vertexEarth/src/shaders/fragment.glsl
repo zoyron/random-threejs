@@ -16,5 +16,5 @@ void main(){
   // putting 1.0 in alpha would give complete earth
   // putting the "alpha" variable there would give just land
   // to get just water from the "alpha" variable, remove "1.0 -"
-  gl_FragColor = vec4(color, alpha);
+  gl_FragColor = vec4(color, 1.0);
 }
