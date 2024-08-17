@@ -12,5 +12,9 @@ void main(){
 
   vec3 color = texture2D(uColorMap, vUv).rgb;
   float alpha = 1.0 - texture2D(uAlphaMap, vUv).r;
-  gl_FragColor = vec4(color, 1.0);
+  
+  // putting 1.0 in alpha would give complete earth
+  // putting the "alpha" variable there would give just land
+  // to get just water from the "alpha" variable, remove "1.0 -"
+  gl_FragColor = vec4(color, alpha);
 }
