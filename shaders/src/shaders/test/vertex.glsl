@@ -20,6 +20,7 @@ void main(){
   // modelPosition.z += aRandom * 0.1;
   vec4 viewPosition = viewMatrix * modelPosition;
   vec4 projectedPosition = projectionMatrix * viewPosition;
+  gl_PointSize = 3.0;
   gl_Position = projectedPosition;
   vRandom = aRandom;
   vUv = uv;

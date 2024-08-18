@@ -1,20 +1,26 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import GUI from "lil-gui";
 import vertexShader from "./shaders/test/vertex.glsl";
 import fragmentShader from "./shaders/test/fragment.glsl";
 
 /**
  * Base
  */
-// Debug
-const gui = new GUI();
 
 // Canvas
 const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
+
+// SpotLight
+const spotLight = new THREE.SpotLight(0xffffff, 4);
+spotLight.position.set(0, 4, 4);
+spotLight.angle = 0.15;
+spotLight.penumbra = 1;
+spotLight.decay = 0;
+spotLight.castShadow = true;
+scene.add(spotLight);
 
 /**
  * Textures
@@ -29,7 +35,8 @@ const textureLoader = new THREE.TextureLoader();
 const flagTexture = textureLoader.load("/textures/indianFlag.png");
 
 // Geometry
-const geometry = new THREE.PlaneGeometry(0.75, 0.75, 32, 32);
+const vert = 200;
+const geometry = new THREE.PlaneGeometry(1, 1, vert, vert);
 const count = geometry.attributes.position.count;
 const randoms = new Float32Array(count);
 for (let i = 0; i < count; i++) {
@@ -44,14 +51,14 @@ const material = new THREE.RawShaderMaterial({
   vertexShader: vertexShader,
   fragmentShader: fragmentShader,
   uniforms: {
-    uFrequency: { value: new THREE.Vector2(10, 5) },
+    uFrequency: { value: new THREE.Vector2(7, 5) },
     uTime: { value: 0 },
     uTexture: { value: flagTexture },
   },
 });
 
 // Mesh
-const mesh = new THREE.Mesh(geometry, material);
+const mesh = new THREE.Points(geometry, material);
 mesh.scale.y = 0.66;
 scene.add(mesh);
 
@@ -87,7 +94,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   100
 );
-camera.position.set(0.25, -0.25, 1);
+camera.position.set(0.25, 0.25, 1);
 scene.add(camera);
 
 // Controls
