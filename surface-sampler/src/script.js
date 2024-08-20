@@ -3,6 +3,8 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { MeshSurfaceSampler } from "three/addons/math/MeshSurfaceSampler.js";
 import { GLTFLoader } from "three/examples/jsm/Addons.js";
 
+// const vertices = new Float32Array(count * 3);
+
 /**
  * Base setup
  */
@@ -41,17 +43,46 @@ scene.add(camera);
 let sampler = null;
 let chatacter = null;
 const loader = new GLTFLoader();
+const vertices = [];
+
 loader.load("/model/Character.glb", (obj) => {
-  console.log(obj.scene);
-  // obj.scene.scale.set(0.035, 0.035, 0.035);
-  obj.scene.position.set(0, -1.5, 0);
-  chatacter = obj.scene;
-  chatacter.traverse((child) => {
-    if (child.isMesh) {
-      child.material.wireframe = true;
+  obj.scene.traverse((child) => {
+    // obj.scene.position.set(0, 10, 0);
+    if (child.isMesh && child.geometry) {
+      const positionAttribute = child.geometry.attributes.position;
+      const vertexCount = positionAttribute.count;
+
+      for (let i = 0; i < vertexCount; i++) {
+        const vertex = new THREE.Vector3();
+        vertex.fromBufferAttribute(positionAttribute, i);
+
+        // Apply the mesh's world matrix to get the correct world position
+        vertex.applyMatrix4(child.matrixWorld);
+
+        vertices.push(vertex.x, vertex.y, vertex.z);
+      }
     }
   });
-  scene.add(obj.scene);
+
+  // After collecting all vertices
+  const pointsGeometry = new THREE.BufferGeometry();
+  pointsGeometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(vertices, 3)
+  );
+
+  const pointsMaterial = new THREE.PointsMaterial({
+    color: 0x0080fa,
+    size: 0.02,
+    transparent: true,
+    opacity: 0.75,
+  });
+
+  const pointsCharacter = new THREE.Points(pointsGeometry, pointsMaterial);
+  pointsCharacter.position.set(0, -1.5, 0);
+  group.add(pointsCharacter);
+
+  console.log(`Created points from ${vertices.length / 3} vertices`);
 });
 
 /**
@@ -90,7 +121,7 @@ controls.enableDamping = true;
 // Animate
 const animate = () => {
   // Rotate mesh
-  group.rotation.x += 0.0125;
+  // group.rotation.x += 0.0125;
   group.rotation.y += 0.0125;
 
   // Update controls
