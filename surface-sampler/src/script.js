@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { MeshSurfaceSampler } from "three/addons/math/MeshSurfaceSampler.js";
+import { GLTFLoader } from "three/examples/jsm/Addons.js";
 
 /**
  * Base setup
@@ -7,8 +9,12 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 // Canvas
 const canvas = document.querySelector("canvas.webgl");
 
-// Scene
+// Scene and a group
 const scene = new THREE.Scene();
+const group = new THREE.Group();
+scene.add(group);
+const ambientLight = new THREE.AmbientLight(0xffffff, 4.0);
+scene.add(ambientLight);
 
 // Sizes
 const sizes = {
@@ -26,16 +32,21 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.set(3, 3, 3);
+camera.position.set(0, 1, 4);
 scene.add(camera);
 
 /**
- * Adding a base mesh
+ * Loading the model
  */
-const geometry = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
-const material = new THREE.MeshNormalMaterial();
-const mesh = new THREE.Mesh(geometry, material);
-scene.add(mesh);
+const sampler = null;
+const chatacter = null;
+const loader = new GLTFLoader();
+loader.load("/model/Character.glb", (obj) => {
+  console.log(obj);
+  // obj.scene.scale.set(0.035, 0.035, 0.035);
+  obj.scene.position.set(0, -1.5, 0);
+  scene.add(obj.scene);
+});
 
 /**
  * Renderer and Resizing
@@ -65,6 +76,7 @@ window.addEventListener("resize", () => {
 /**
  * Animate and controls
  */
+
 // Controls
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
@@ -72,8 +84,8 @@ controls.enableDamping = true;
 // Animate
 const animate = () => {
   // Rotate mesh
-  mesh.rotation.x += 0.0125;
-  mesh.rotation.y += 0.0125;
+  group.rotation.x += 0.0125;
+  group.rotation.y += 0.0125;
 
   // Update controls
   controls.update();
