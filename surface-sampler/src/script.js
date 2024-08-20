@@ -38,13 +38,19 @@ scene.add(camera);
 /**
  * Loading the model
  */
-const sampler = null;
-const chatacter = null;
+let sampler = null;
+let chatacter = null;
 const loader = new GLTFLoader();
 loader.load("/model/Character.glb", (obj) => {
-  console.log(obj);
+  console.log(obj.scene);
   // obj.scene.scale.set(0.035, 0.035, 0.035);
   obj.scene.position.set(0, -1.5, 0);
+  chatacter = obj.scene;
+  chatacter.traverse((child) => {
+    if (child.isMesh) {
+      child.material.wireframe = true;
+    }
+  });
   scene.add(obj.scene);
 });
 
