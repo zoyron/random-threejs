@@ -1,9 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { MeshSurfaceSampler } from "three/addons/math/MeshSurfaceSampler.js";
-import { GLTFLoader } from "three/examples/jsm/Addons.js";
-
-// const vertices = new Float32Array(count * 3);
+import { OBJLoader } from "three/examples/jsm/Addons.js";
+import { MTLLoader } from "three/examples/jsm/Addons.js";
 
 /**
  * Base setup
@@ -11,12 +9,14 @@ import { GLTFLoader } from "three/examples/jsm/Addons.js";
 // Canvas
 const canvas = document.querySelector("canvas.webgl");
 
-// Scene and a group
+// Scene
 const scene = new THREE.Scene();
-const group = new THREE.Group();
-scene.add(group);
-const ambientLight = new THREE.AmbientLight(0xffffff, 4.0);
-scene.add(ambientLight);
+const light = new THREE.AmbientLight(0xffffff, 4);
+scene.add(light);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
+directionalLight.position.set(5, 5, 5);
+scene.add(directionalLight);
 
 // Sizes
 const sizes = {
@@ -34,56 +34,44 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.set(0, 1, 4);
+camera.position.set(20, 20, 20);
 scene.add(camera);
 
 /**
- * Loading the model
+ * Adding the 3d object
  */
-let sampler = null;
-let chatacter = null;
-const loader = new GLTFLoader();
-const vertices = [];
 
-loader.load("/model/Character.glb", (obj) => {
-  obj.scene.traverse((child) => {
-    // obj.scene.position.set(0, 10, 0);
-    if (child.isMesh && child.geometry) {
-      const positionAttribute = child.geometry.attributes.position;
-      const vertexCount = positionAttribute.count;
+const materialLoader = new MTLLoader();
+const objectLoader = new OBJLoader();
+materialLoader.load("/model/treeMaterial.mtl", (material) => {
+  material.preload();
 
-      for (let i = 0; i < vertexCount; i++) {
-        const vertex = new THREE.Vector3();
-        vertex.fromBufferAttribute(positionAttribute, i);
-
-        // Apply the mesh's world matrix to get the correct world position
-        vertex.applyMatrix4(child.matrixWorld);
-
-        vertices.push(vertex.x, vertex.y, vertex.z);
+  objectLoader.setMaterials(material);
+  objectLoader.load("/model/tree.obj", (obj) => {
+    obj.position.set(0, -12, 0);
+    obj.traverse((child) => {
+      if (child.isMesh) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach((mat) => {
+            mat.wireframe = true;
+          });
+        } else {
+          child.material.wireframe = true;
+        }
       }
-    }
+    });
+    scene.add(obj);
+    console.log(obj);
   });
-
-  // After collecting all vertices
-  const pointsGeometry = new THREE.BufferGeometry();
-  pointsGeometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(vertices, 3)
-  );
-
-  const pointsMaterial = new THREE.PointsMaterial({
-    color: 0x0080fa,
-    size: 0.02,
-    transparent: true,
-    opacity: 0.75,
-  });
-
-  const pointsCharacter = new THREE.Points(pointsGeometry, pointsMaterial);
-  pointsCharacter.position.set(0, -1.5, 0);
-  group.add(pointsCharacter);
-
-  console.log(`Created points from ${vertices.length / 3} vertices`);
 });
+
+/**
+ * Adding a base mesh
+ */
+const geometry = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
+const material = new THREE.MeshNormalMaterial();
+const mesh = new THREE.Mesh(geometry, material);
+// scene.add(mesh);
 
 /**
  * Renderer and Resizing
@@ -113,7 +101,6 @@ window.addEventListener("resize", () => {
 /**
  * Animate and controls
  */
-
 // Controls
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
@@ -121,8 +108,8 @@ controls.enableDamping = true;
 // Animate
 const animate = () => {
   // Rotate mesh
-  // group.rotation.x += 0.0125;
-  group.rotation.y += 0.0125;
+  mesh.rotation.x += 0.0125;
+  mesh.rotation.y += 0.0125;
 
   // Update controls
   controls.update();
