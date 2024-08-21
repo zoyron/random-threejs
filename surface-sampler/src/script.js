@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { OBJLoader } from "three/examples/jsm/Addons.js";
+import { MeshSurfaceSampler, OBJLoader } from "three/examples/jsm/Addons.js";
 import { MTLLoader } from "three/examples/jsm/Addons.js";
 
 /**
@@ -41,6 +41,9 @@ scene.add(camera);
  * Adding the 3d object
  */
 
+let character = null;
+let sampler = null;
+
 const materialLoader = new MTLLoader();
 const objectLoader = new OBJLoader();
 materialLoader.load("/model/treeMaterial.mtl", (material) => {
@@ -60,18 +63,51 @@ materialLoader.load("/model/treeMaterial.mtl", (material) => {
         }
       }
     });
-    scene.add(obj);
+    character = obj.children[0];
+    sampler = new MeshSurfaceSampler(character).build();
+    console.log(sampler);
+    // scene.add(obj);
     console.log(obj);
+    createPoints();
   });
 });
 
 /**
  * Adding a base mesh
  */
-const geometry = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
-const material = new THREE.MeshNormalMaterial();
-const mesh = new THREE.Mesh(geometry, material);
-// scene.add(mesh);
+
+function createPoints() {
+  let count = 9000;
+  let tempPosition = new THREE.Vector3();
+  let vertices = new Float32Array(count * 3);
+
+  // setting the points collected from the tree sampler inside the vertices
+  // this will be used for creating a buffer geometry
+  for (let i = 0; i < count; i++) {
+    sampler.sample(tempPosition);
+    const index = i * 3;
+    vertices[index + 0] = tempPosition.x;
+    vertices[index + 1] = tempPosition.y;
+    vertices[index + 2] = tempPosition.z;
+  }
+
+  // creating the buffer geometry from the points of the tree
+  const pointsGeometry = new THREE.BufferGeometry();
+  pointsGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(vertices, 3)
+  );
+
+  // creating the points material
+  const pointsMaterial = new THREE.PointsMaterial({
+    size: 0.05,
+  });
+
+  // const creating the points mesh or just points
+  const points = new THREE.Points(pointsGeometry, pointsMaterial);
+  points.position.set(0, -12, 0);
+  scene.add(points);
+}
 
 /**
  * Renderer and Resizing
@@ -108,8 +144,8 @@ controls.enableDamping = true;
 // Animate
 const animate = () => {
   // Rotate mesh
-  mesh.rotation.x += 0.0125;
-  mesh.rotation.y += 0.0125;
+  // mesh.rotation.x += 0.0125;
+  // mesh.rotation.y += 0.0125;
 
   // Update controls
   controls.update();
