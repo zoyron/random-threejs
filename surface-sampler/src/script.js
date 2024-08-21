@@ -43,6 +43,7 @@ scene.add(camera);
 
 let character = null;
 let sampler = null;
+let pointsGeometry, pointsMaterial, points;
 
 const materialLoader = new MTLLoader();
 const objectLoader = new OBJLoader();
@@ -66,47 +67,41 @@ materialLoader.load("/model/treeMaterial.mtl", (material) => {
     character = obj.children[0];
     sampler = new MeshSurfaceSampler(character).build();
     console.log(sampler);
-    // scene.add(obj);
+    scene.add(obj);
     console.log(obj);
-    createPoints();
+    pointsGeometry = new THREE.BufferGeometry();
+    pointsMaterial = new THREE.PointsMaterial({
+      color: 0x0080fa,
+      size: 0.2,
+    });
+    points = new THREE.Points(pointsGeometry, pointsMaterial);
+    points.position.set(0, -12, 0);
+    scene.add(points);
   });
 });
 
 /**
- * Adding a base mesh
+ * Create points and add points
  */
 
-function createPoints() {
-  let count = 9000;
-  let tempPosition = new THREE.Vector3();
-  let vertices = new Float32Array(count * 3);
+// this creates the points(mesh)
+let count = 19000;
+let tempPosition = new THREE.Vector3();
+let vertices = new Float32Array(count * 3);
+let i = 0;
 
-  // setting the points collected from the tree sampler inside the vertices
-  // this will be used for creating a buffer geometry
-  for (let i = 0; i < count; i++) {
+// this function adds a point to the scene when called
+function addPoint() {
+  if (sampler) {
     sampler.sample(tempPosition);
-    const index = i * 3;
-    vertices[index + 0] = tempPosition.x;
-    vertices[index + 1] = tempPosition.y;
-    vertices[index + 2] = tempPosition.z;
+    vertices[i++] = tempPosition.x;
+    vertices[i++] = tempPosition.y;
+    vertices[i++] = tempPosition.z;
+    pointsGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(vertices, 3)
+    );
   }
-
-  // creating the buffer geometry from the points of the tree
-  const pointsGeometry = new THREE.BufferGeometry();
-  pointsGeometry.setAttribute(
-    "position",
-    new THREE.BufferAttribute(vertices, 3)
-  );
-
-  // creating the points material
-  const pointsMaterial = new THREE.PointsMaterial({
-    size: 0.05,
-  });
-
-  // const creating the points mesh or just points
-  const points = new THREE.Points(pointsGeometry, pointsMaterial);
-  points.position.set(0, -12, 0);
-  scene.add(points);
 }
 
 /**
@@ -149,6 +144,13 @@ const animate = () => {
 
   // Update controls
   controls.update();
+
+  // adding the points to the obj
+  if (i < count * 3) {
+    for (let x = 1; x <= 5; x++) {
+      addPoint();
+    }
+  }
 
   // Adding renderer
   renderer.render(scene, camera);
