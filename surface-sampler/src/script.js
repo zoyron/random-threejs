@@ -40,7 +40,7 @@ scene.add(camera);
 
 let character = null;
 let sampler = null;
-let opp = 0.075;
+let opp = 0.125;
 let pointsGeometry, pointsMaterial, points;
 
 const objectLoader = new OBJLoader();
