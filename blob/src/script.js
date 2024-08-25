@@ -35,7 +35,7 @@ scene.add(camera);
 /**
  * Adding a base mesh
  */
-const geometry = new THREE.IcosahedronGeometry(2, 25);
+const geometry = new THREE.IcosahedronGeometry( 2, 30 ); 
 const material = new THREE.ShaderMaterial({
   wireframe: true,
   vertexShader: vertex,
