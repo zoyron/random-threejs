@@ -51,12 +51,12 @@ const material = new THREE.MeshBasicMaterial({
   wireframe: true,
 });
 const mesh = new THREE.Mesh(geometry, material);
-group.add(mesh);
+// group.add(mesh);
 
 // points mesh
-const vert = 500;
-const pointsGeometry = new THREE.SphereGeometry(2.5, vert, vert, vert);
-// const pointsGeometry = new THREE.IcosahedronGeometry(2, vert);
+const vert = 200;
+// const pointsGeometry = new THREE.SphereGeometry(2.5, vert, vert, vert);
+const pointsGeometry = new THREE.IcosahedronGeometry(2.75, vert);
 // const pointsMaterial = new THREE.PointsMaterial({
 //   size: 0.03,
 //   map: colorMap,
@@ -66,6 +66,7 @@ const pointsGeometry = new THREE.SphereGeometry(2.5, vert, vert, vert);
 const pointsMaterial = new THREE.ShaderMaterial({
   transparent: true,
   uniforms: {
+    uTime: { value: 0.0 },
     uSize: { value: 3.0 },
     uColorMap: { value: colorMap },
     uElevationMap: { value: elevationMap },
@@ -118,6 +119,9 @@ const animate = () => {
   // Rotate mesh
   // group.rotation.x += 0.0125;
   group.rotation.y += 0.0025;
+
+  // Update time
+  pointsMaterial.uniforms.uTime.value += 0.0215;
 
   // Update controls
   controls.update();
