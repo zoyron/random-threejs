@@ -31,3 +31,12 @@ ___
 
 ### [Blob](./blob/)
 ![Blob](./public/assets/blob.gif)
+
+---
+
+### [Blobby Earth](./blobby-earth/)
+![blobby earth](./public/assets/blobby-earth.gif)
+
+___
+
+### 
