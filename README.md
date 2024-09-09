@@ -24,3 +24,10 @@ npm run dev
 ```
 
 After following the above steps, the animation would open in your browser window. 
+
+___
+
+# Experiments in this repository
+
+## 1. [Blob](./blob/)
+![Blob](./public/assets/blob.gif)
