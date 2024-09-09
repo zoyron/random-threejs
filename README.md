@@ -47,5 +47,15 @@ ___
 ![Galaxy](./public/assets/galaxy.gif)
 ___
 
-### Imported Model(./imported-models/)
+### [Imported Model](./imported-models/)
 ![Imported Model](./public/assets/import-model.gif)
+___
+
+### [Shaders](./shaders/)
+![Shaders](./public/assets/shaders.gif)
+___
+
+### [Solar System](./solarSystem/)
+> This is not complete yet
+![Solar system](./public/assets/solar-system.gif)
+___
