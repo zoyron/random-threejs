@@ -1,8 +1,8 @@
-# Random threejs experiments
+# Random threejs sketches
 
 ## Install and run
 
-To the any experiment make sure you have node installed on your system. 
+To the any sketch make sure you have node installed on your system. 
 
 Then clone this repository, get into the directory of your choice inside this repo, install dependencies, fireup the server, and you're good to go.
 
@@ -12,9 +12,9 @@ Follow the bellow steps to install and run:
 # clone this repository
 git clone https://github.com/zoyron/random-threejs.git
 
-# cd into the project and then any directory of your choice of experiment
+# cd into the project and then any directory of your choice of sketch
 cd random-threejs
-cd {experiment_of_your_choice}
+cd {sketch_of_your_choice}
 
 # install dependencies
 npm install
@@ -27,7 +27,7 @@ After following the above steps, the animation would open in your browser window
 
 ___
 
-# Experiments in this repository
+# sketches in this repository
 
 ### [Blob](./blob/)
 ![Blob](./public/assets/blob.gif)
