@@ -29,5 +29,5 @@ ___
 
 # Experiments in this repository
 
-### - [Blob](./blob/)
+### [Blob](./blob/)
 ![Blob](./public/assets/blob.gif)
