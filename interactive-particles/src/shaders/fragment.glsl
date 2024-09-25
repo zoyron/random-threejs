@@ -12,5 +12,5 @@ void main(){
   float alpha = texture2D(uAlphaMap, vUv).r;
 
   vec3 color = texture2D(uColorMap, vUv).rgb;
-  gl_FragColor = vec4(color, alpha);
+  gl_FragColor = vec4(color, alpha - 0.5);
 }
