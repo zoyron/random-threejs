@@ -41,12 +41,14 @@ scene.add(camera);
 // Texture
 const textureLoader = new THREE.TextureLoader();
 const colorMap = textureLoader.load("/sunTexture.jpeg");
+const alphaMap = textureLoader.load("/sunTexture.jpeg");
 
 const vert = 100;
 const geometry = new THREE.IcosahedronGeometry(2, vert);
 const material = new THREE.ShaderMaterial({
   uniforms: {
     uColorMap: { value: colorMap },
+    uAlphaMap: { value: alphaMap },
     uTime: { value: 0.0 },
     uSize: { value: 3.0 },
   },
