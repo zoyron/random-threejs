@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import vertexShader from "./shaders/vertex.glsl";
+import fragmentShader from "./shaders/fragment.glsl";
 
 /**
  * Base setup
@@ -10,7 +12,7 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf0f0f0);
+scene.background = new THREE.Color(0x000);
 
 // Sizes
 const sizes = {
@@ -35,9 +37,24 @@ scene.add(camera);
 /**
  * Adding a base mesh
  */
-const geometry = new THREE.BoxGeometry(2, 2, 2, 8, 8, 8);
-const material = new THREE.MeshNormalMaterial();
-const mesh = new THREE.Mesh(geometry, material);
+
+// Texture
+const textureLoader = new THREE.TextureLoader();
+const colorMap = textureLoader.load("/sunTexture.jpeg");
+
+const vert = 100;
+const geometry = new THREE.IcosahedronGeometry(2, vert);
+const material = new THREE.ShaderMaterial({
+  uniforms: {
+    uColorMap: { value: colorMap },
+    uTime: { value: 0.0 },
+    uSize: { value: 3.0 },
+  },
+  transparent: true,
+  vertexShader: vertexShader,
+  fragmentShader: fragmentShader,
+});
+const mesh = new THREE.Points(geometry, material);
 scene.add(mesh);
 
 /**
@@ -75,8 +92,10 @@ controls.enableDamping = true;
 // Animate
 const animate = () => {
   // Rotate mesh
-  mesh.rotation.x += 0.0125;
-  mesh.rotation.y += 0.0125;
+  mesh.rotation.y += 0.005;
+
+  // Update time
+  material.uniforms.uTime.value += 0.0025;
 
   // Update controls
   controls.update();

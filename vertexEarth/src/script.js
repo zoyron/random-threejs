@@ -45,22 +45,11 @@ const alphaMap = textureLoader.load("/earthspec1k.jpg");
 /**
  * Adding a base mesh
  */
-const geometry = new THREE.IcosahedronGeometry(2.5, 10);
-const material = new THREE.MeshBasicMaterial({
-  color: 0x202020,
-  wireframe: true,
-});
-const mesh = new THREE.Mesh(geometry, material);
-// group.add(mesh);
 
 // points mesh
 const vert = 200;
 // const pointsGeometry = new THREE.SphereGeometry(2.5, vert, vert, vert);
 const pointsGeometry = new THREE.IcosahedronGeometry(2.75, vert);
-// const pointsMaterial = new THREE.PointsMaterial({
-//   size: 0.03,
-//   map: colorMap,
-// });
 
 // Shader material
 const pointsMaterial = new THREE.ShaderMaterial({
