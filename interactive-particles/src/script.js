@@ -40,18 +40,29 @@ scene.add(camera);
 
 // Texture
 const textureLoader = new THREE.TextureLoader();
-const colorMap = textureLoader.load("/sunTexture.jpeg");
-const alphaMap = textureLoader.load("/sunTexture.jpeg");
+const colorMap = textureLoader.load("/earthmap1k.jpg");
 
-const vert = 40;
+const vert = 200;
+
+// inner wiring
+const geo = new THREE.IcosahedronGeometry(3, 64);
+const mat = new THREE.MeshBasicMaterial({
+  color: 0x202020,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.02,
+});
+const innerWire = new THREE.Mesh(geo, mat);
+scene.add(innerWire);
+
+// Points material or earth
 const geometry = new THREE.IcosahedronGeometry(3, vert);
 const material = new THREE.ShaderMaterial({
   uniforms: {
     uColorMap: { value: colorMap },
-    uAlphaMap: { value: alphaMap },
     uTime: { value: 0.0 },
     uSize: { value: 3.0 },
-    uMouseUV: { value: new THREE.Vector2(0.0, 0.0) },
+    uMouseUV: { type: "v2", value: new THREE.Vector2(0.0, 0.0) },
   },
   transparent: true,
   vertexShader: vertexShader,
@@ -67,20 +78,12 @@ scene.add(mesh);
 const pointerPos = new THREE.Vector2();
 const sunUV = new THREE.Vector2();
 
-// mouse-move event listener and setting the pointerPos vector's values
-window.addEventListener("mousemove", (evt) => {
-  pointerPos.set(
-    (evt.clientX / sizes.width) * 2 - 1, // this changes the range from [0,1] to [-1, 1]
-    -(evt.clientY / sizes.height) * 2 + 1
-  );
-});
-
 // Adding raycaster to set the value of sunUV
 const raycaster = new THREE.Raycaster();
 function handleRaycast() {
   raycaster.setFromCamera(pointerPos, camera);
-  const intersects = raycaster.intersectObjects([mesh], false);
-  if (intersects.length > 0) {
+  const intersects = raycaster.intersectObjects([innerWire], false);
+  if (intersects.length > 0 && intersects[0].uv) {
     sunUV.copy(intersects[0].uv);
   }
   material.uniforms.uMouseUV.value = sunUV;
@@ -121,10 +124,13 @@ controls.enableDamping = true;
 // Animate
 const animate = () => {
   // Rotate mesh
-  mesh.rotation.y += 0.005;
+  mesh.rotation.y += 0.0025;
 
   // Update time
-  material.uniforms.uTime.value += 0.0025;
+  material.uniforms.uTime.value += 0.00025;
+
+  // Calling the raycast function
+  handleRaycast();
 
   // Update controls
   controls.update();
@@ -137,3 +143,11 @@ const animate = () => {
 };
 
 animate();
+
+// mouse-move event listener and setting the pointerPos vector's values
+window.addEventListener("mousemove", (evt) => {
+  pointerPos.set(
+    (evt.clientX / window.innerWidth) * 2 - 1, // this changes the range from [0,1] to [-1, 1]
+    -(evt.clientY / window.innerHeight) * 2 + 1
+  );
+});
