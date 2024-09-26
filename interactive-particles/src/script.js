@@ -43,14 +43,15 @@ const textureLoader = new THREE.TextureLoader();
 const colorMap = textureLoader.load("/sunTexture.jpeg");
 const alphaMap = textureLoader.load("/sunTexture.jpeg");
 
-const vert = 50;
-const geometry = new THREE.IcosahedronGeometry(2, vert);
+const vert = 40;
+const geometry = new THREE.IcosahedronGeometry(3, vert);
 const material = new THREE.ShaderMaterial({
   uniforms: {
     uColorMap: { value: colorMap },
     uAlphaMap: { value: alphaMap },
     uTime: { value: 0.0 },
     uSize: { value: 3.0 },
+    uMouseUV: { value: new THREE.Vector2(0.0, 0.0) },
   },
   transparent: true,
   vertexShader: vertexShader,
@@ -58,6 +59,32 @@ const material = new THREE.ShaderMaterial({
 });
 const mesh = new THREE.Points(geometry, material);
 scene.add(mesh);
+
+/**
+ * Adding mouse interactivity
+ */
+
+const pointerPos = new THREE.Vector2();
+const sunUV = new THREE.Vector2();
+
+// mouse-move event listener and setting the pointerPos vector's values
+window.addEventListener("mousemove", (evt) => {
+  pointerPos.set(
+    (evt.clientX / sizes.width) * 2 - 1, // this changes the range from [0,1] to [-1, 1]
+    -(evt.clientY / sizes.height) * 2 + 1
+  );
+});
+
+// Adding raycaster to set the value of sunUV
+const raycaster = new THREE.Raycaster();
+function handleRaycast() {
+  raycaster.setFromCamera(pointerPos, camera);
+  const intersects = raycaster.intersectObjects([mesh], false);
+  if (intersects.length > 0) {
+    sunUV.copy(intersects[0].uv);
+  }
+  material.uniforms.uMouseUV.value = sunUV;
+}
 
 /**
  * Renderer and Resizing
