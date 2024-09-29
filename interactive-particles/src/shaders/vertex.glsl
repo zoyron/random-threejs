@@ -17,7 +17,7 @@ void main(){
   float dist = distance(uMouseUV, vUv);
   float zDisp = 0.0;
   if(dist < 0.05){
-    zDisp = (0.05 - dist) * 10.0;
+    zDisp = (0.05 - dist) * 5.0;
   }
   mvPosition.z += zDisp;
   gl_PointSize = uSize;

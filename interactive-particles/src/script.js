@@ -42,27 +42,26 @@ scene.add(camera);
 const textureLoader = new THREE.TextureLoader();
 const colorMap = textureLoader.load("/earthmap1k.jpg");
 
-const vert = 200;
-
 // inner wiring
-const geo = new THREE.IcosahedronGeometry(3, 64);
+const geo = new THREE.IcosahedronGeometry(2, 16);
 const mat = new THREE.MeshBasicMaterial({
   color: 0x202020,
   wireframe: true,
   transparent: true,
-  opacity: 0.02,
+  opacity: 0.5,
 });
 const innerWire = new THREE.Mesh(geo, mat);
 scene.add(innerWire);
 
 // Points material or earth
-const geometry = new THREE.IcosahedronGeometry(3, vert);
+const vert = 200;
+const geometry = new THREE.IcosahedronGeometry(2, vert);
 const material = new THREE.ShaderMaterial({
   uniforms: {
     uColorMap: { value: colorMap },
     uTime: { value: 0.0 },
     uSize: { value: 3.0 },
-    uMouseUV: { type: "v2", value: new THREE.Vector2(0.0, 0.0) },
+    uMouseUV: { value: new THREE.Vector2(0.0, 0.0) },
   },
   transparent: true,
   vertexShader: vertexShader,
