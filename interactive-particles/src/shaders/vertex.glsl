@@ -6,6 +6,7 @@ uniform sampler2D uElevationMap;
 varying float vVisible;
 varying vec2 vUv;
 varying float vDist;
+varying float vThreshold;
 
 void main(){
   vUv = uv;
@@ -17,13 +18,14 @@ void main(){
   // the part I took from github ends here
 
   float elevation = texture2D(uElevationMap, uv).r;
-  mvPosition.z += 0.35 * elevation;
+  mvPosition.z += 0.5 * elevation;
 
   float dist = distance(uMouseUV, vUv);
   vDist = dist;
   float zDisp = 0.0;
-  if(dist < 0.05){
-    zDisp = (0.05 - dist) * 10.0;
+  vThreshold = 0.05;
+  if(dist < vThreshold){
+    zDisp = (vThreshold - dist) * 5.0;
   }
   mvPosition.z += zDisp;
   gl_PointSize = uSize;

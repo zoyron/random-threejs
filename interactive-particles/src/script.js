@@ -13,6 +13,7 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
+// scene.background = new THREE.Color(0x1a1d23);
 
 // Sizes
 const sizes = {
@@ -41,37 +42,39 @@ scene.add(camera);
 // Texture
 const textureLoader = new THREE.TextureLoader();
 const colorMap = textureLoader.load("/earthmap1k.jpg");
-const lightMap = textureLoader.load("/earthlights1k.jpg");
+const lightMap = textureLoader.load("/earthrainbow1k.jpg");
 const starTexture = textureLoader.load("/circle.png");
 const elevationMap = textureLoader.load("/earthbump1k.jpg");
+const alphaMap = textureLoader.load("/earthspec1k.jpg");
 
 // adding the star field
 const stars = getStarField({ numStars: 4500, sprite: starTexture });
 scene.add(stars);
 
 // inner wiring
-const radius = 2.25;
+const radius = 2.5;
 
-const geo = new THREE.IcosahedronGeometry(radius, 2);
-const mat = new THREE.MeshStandardMaterial({
-  color: 0x202020,
-  wireframe: false,
+const geo = new THREE.IcosahedronGeometry(radius, 32);
+const mat = new THREE.MeshBasicMaterial({
+  color: 0x0080fa,
+  wireframe: true,
   transparent: true,
-  opacity: 0,
+  opacity: 0.2,
 });
 const innerWire = new THREE.Mesh(geo, mat);
 scene.add(innerWire);
 
 // Points material or earth
-const vert = 150;
+const vert = 200;
 const geometry = new THREE.IcosahedronGeometry(radius, vert);
 const material = new THREE.ShaderMaterial({
   uniforms: {
     uColorMap: { value: colorMap },
     uLightMap: { value: lightMap },
     uElevationMap: { value: elevationMap },
+    uAlphaMap: { value: alphaMap },
     uTime: { value: 0.0 },
-    uSize: { value: 4.0 },
+    uSize: { value: 3.0 },
     uMouseUV: { value: new THREE.Vector2(0.0, 0.0) },
   },
   transparent: true,
