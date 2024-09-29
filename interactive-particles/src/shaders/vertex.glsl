@@ -1,6 +1,7 @@
 uniform float uSize;
 uniform float uTime;
 uniform vec2 uMouseUV;
+uniform sampler2D uElevationMap;
 
 varying float vVisible;
 varying vec2 vUv;
@@ -14,6 +15,9 @@ void main(){
   vec3 vNormal = normalMatrix * normal;
   vVisible = step(0.0, dot( -normalize(mvPosition.xyz), normalize(vNormal)));
   // the part I took from github ends here
+
+  float elevation = texture2D(uElevationMap, uv).r;
+  mvPosition.z += 0.35 * elevation;
 
   float dist = distance(uMouseUV, vUv);
   vDist = dist;

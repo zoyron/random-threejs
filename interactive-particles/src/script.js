@@ -40,16 +40,17 @@ scene.add(camera);
 
 // Texture
 const textureLoader = new THREE.TextureLoader();
-const sunColorMap = textureLoader.load("/earthmap1k.jpg");
-const colorMap = textureLoader.load("/earthlights1k.jpg");
+const colorMap = textureLoader.load("/earthmap1k.jpg");
+const lightMap = textureLoader.load("/earthlights1k.jpg");
 const starTexture = textureLoader.load("/circle.png");
+const elevationMap = textureLoader.load("/earthbump1k.jpg");
 
 // adding the star field
 const stars = getStarField({ numStars: 4500, sprite: starTexture });
 scene.add(stars);
 
 // inner wiring
-const radius = 2.5;
+const radius = 2.25;
 
 const geo = new THREE.IcosahedronGeometry(radius, 2);
 const mat = new THREE.MeshStandardMaterial({
@@ -67,7 +68,8 @@ const geometry = new THREE.IcosahedronGeometry(radius, vert);
 const material = new THREE.ShaderMaterial({
   uniforms: {
     uColorMap: { value: colorMap },
-    uSunColorMap: { value: sunColorMap },
+    uLightMap: { value: lightMap },
+    uElevationMap: { value: elevationMap },
     uTime: { value: 0.0 },
     uSize: { value: 4.0 },
     uMouseUV: { value: new THREE.Vector2(0.0, 0.0) },
