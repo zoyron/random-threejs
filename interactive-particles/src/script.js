@@ -12,7 +12,7 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000);
+scene.background = new THREE.Color(0x0f0f0f);
 
 // Sizes
 const sizes = {
@@ -40,8 +40,8 @@ scene.add(camera);
 
 // Texture
 const textureLoader = new THREE.TextureLoader();
-const colorMap = textureLoader.load("/earthmap1k.jpg");
-const sunColorMap = textureLoader.load("/earthlights1k.jpg");
+const sunColorMap = textureLoader.load("/earthmap1k.jpg");
+const colorMap = textureLoader.load("/earthlights1k.jpg");
 
 // inner wiring
 const geo = new THREE.IcosahedronGeometry(2, 2);
@@ -55,7 +55,7 @@ const innerWire = new THREE.Mesh(geo, mat);
 scene.add(innerWire);
 
 // Points material or earth
-const vert = 75;
+const vert = 100;
 const geometry = new THREE.IcosahedronGeometry(2, vert);
 const material = new THREE.ShaderMaterial({
   uniforms: {

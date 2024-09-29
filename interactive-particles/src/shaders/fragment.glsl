@@ -13,7 +13,7 @@ void main(){
 
   vec3 color = texture2D(uSunColorMap, vUv).rgb;
   if(vDist < 0.05){
-    color = mix(texture2D(uColorMap, vUv).rgb,texture2D(uSunColorMap, vUv).rgb, vDist / 2.0);
+    color = mix(texture2D(uColorMap, vUv).rgb,texture2D(uSunColorMap, vUv).rgb, (0.05 - vDist) );
   }
   gl_FragColor = vec4(color, 1.0);
 }
