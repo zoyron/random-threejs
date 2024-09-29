@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import vertexShader from "./shaders/vertex.glsl";
 import fragmentShader from "./shaders/fragment.glsl";
+import getStarField from "./getStarField";
 
 /**
  * Base setup
@@ -12,7 +13,6 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0f0f0f);
 
 // Sizes
 const sizes = {
@@ -42,9 +42,14 @@ scene.add(camera);
 const textureLoader = new THREE.TextureLoader();
 const sunColorMap = textureLoader.load("/earthmap1k.jpg");
 const colorMap = textureLoader.load("/earthlights1k.jpg");
+const starTexture = textureLoader.load("/circle.png");
+
+// adding the star field
+const stars = getStarField({ numStars: 4500, sprite: starTexture });
+scene.add(stars);
 
 // inner wiring
-const radius = 2.75;
+const radius = 2.5;
 
 const geo = new THREE.IcosahedronGeometry(radius, 2);
 const mat = new THREE.MeshStandardMaterial({
