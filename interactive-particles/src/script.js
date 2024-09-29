@@ -83,7 +83,7 @@ const raycaster = new THREE.Raycaster();
 function handleRaycast() {
   raycaster.setFromCamera(pointerPos, camera);
   const intersects = raycaster.intersectObjects([innerWire], false);
-  if (intersects.length > 0 && intersects[0].uv) {
+  if (intersects.length > 0) {
     sunUV.copy(intersects[0].uv);
   }
   material.uniforms.uMouseUV.value = sunUV;
@@ -125,6 +125,7 @@ controls.enableDamping = true;
 const animate = () => {
   // Rotate mesh
   mesh.rotation.y += 0.0025;
+  innerWire.rotation.y += 0.0025;
 
   // Update time
   material.uniforms.uTime.value += 0.00025;
