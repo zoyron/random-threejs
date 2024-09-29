@@ -4,6 +4,7 @@ uniform vec2 uMouseUV;
 
 varying float vVisible;
 varying vec2 vUv;
+varying float vDist;
 
 void main(){
   vUv = uv;
@@ -15,9 +16,10 @@ void main(){
   // the part I took from github ends here
 
   float dist = distance(uMouseUV, vUv);
+  vDist = dist;
   float zDisp = 0.0;
   if(dist < 0.05){
-    zDisp = (0.05 - dist) * 5.0;
+    zDisp = (0.05 - dist) * 10.0;
   }
   mvPosition.z += zDisp;
   gl_PointSize = uSize;

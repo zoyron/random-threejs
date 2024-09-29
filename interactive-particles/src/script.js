@@ -41,26 +41,28 @@ scene.add(camera);
 // Texture
 const textureLoader = new THREE.TextureLoader();
 const colorMap = textureLoader.load("/earthmap1k.jpg");
+const sunColorMap = textureLoader.load("/earthlights1k.jpg");
 
 // inner wiring
-const geo = new THREE.IcosahedronGeometry(2, 16);
-const mat = new THREE.MeshBasicMaterial({
+const geo = new THREE.IcosahedronGeometry(2, 2);
+const mat = new THREE.MeshStandardMaterial({
   color: 0x202020,
-  wireframe: true,
+  wireframe: false,
   transparent: true,
-  opacity: 0.5,
+  opacity: 0,
 });
 const innerWire = new THREE.Mesh(geo, mat);
 scene.add(innerWire);
 
 // Points material or earth
-const vert = 200;
+const vert = 75;
 const geometry = new THREE.IcosahedronGeometry(2, vert);
 const material = new THREE.ShaderMaterial({
   uniforms: {
     uColorMap: { value: colorMap },
+    uSunColorMap: { value: sunColorMap },
     uTime: { value: 0.0 },
-    uSize: { value: 3.0 },
+    uSize: { value: 4.0 },
     uMouseUV: { value: new THREE.Vector2(0.0, 0.0) },
   },
   transparent: true,
@@ -82,7 +84,7 @@ const raycaster = new THREE.Raycaster();
 function handleRaycast() {
   raycaster.setFromCamera(pointerPos, camera);
   const intersects = raycaster.intersectObjects([innerWire], false);
-  if (intersects.length > 0) {
+  if (intersects.length > 0 && intersects[0].uv) {
     sunUV.copy(intersects[0].uv);
   }
   material.uniforms.uMouseUV.value = sunUV;
