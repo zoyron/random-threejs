@@ -44,7 +44,9 @@ const sunColorMap = textureLoader.load("/earthmap1k.jpg");
 const colorMap = textureLoader.load("/earthlights1k.jpg");
 
 // inner wiring
-const geo = new THREE.IcosahedronGeometry(2, 2);
+const radius = 2.75;
+
+const geo = new THREE.IcosahedronGeometry(radius, 2);
 const mat = new THREE.MeshStandardMaterial({
   color: 0x202020,
   wireframe: false,
@@ -55,8 +57,8 @@ const innerWire = new THREE.Mesh(geo, mat);
 scene.add(innerWire);
 
 // Points material or earth
-const vert = 100;
-const geometry = new THREE.IcosahedronGeometry(2, vert);
+const vert = 150;
+const geometry = new THREE.IcosahedronGeometry(radius, vert);
 const material = new THREE.ShaderMaterial({
   uniforms: {
     uColorMap: { value: colorMap },
