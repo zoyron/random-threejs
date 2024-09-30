@@ -23,7 +23,7 @@ void main(){
   float dist = distance(uMouseUV, vUv);
   vDist = dist;
   float zDisp = 0.0;
-  vThreshold = 0.05;
+  vThreshold = 0.07;
   if(dist < vThreshold){
     zDisp = (vThreshold - dist) * 5.0;
   }

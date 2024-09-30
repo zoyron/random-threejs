@@ -13,7 +13,7 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
-// scene.background = new THREE.Color(0x1a1d23);
+scene.background = new THREE.Color(0x1a1d23);
 
 // Sizes
 const sizes = {
@@ -56,7 +56,7 @@ const radius = 2.5;
 
 const geo = new THREE.IcosahedronGeometry(radius, 32);
 const mat = new THREE.MeshBasicMaterial({
-  color: 0x0080fa,
+  color: 0x00004b,
   wireframe: true,
   transparent: true,
   opacity: 0.2,
