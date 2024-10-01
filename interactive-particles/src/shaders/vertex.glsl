@@ -25,7 +25,7 @@ void main(){
   float zDisp = 0.0;
   vThreshold = 0.07;
   if(dist < vThreshold){
-    zDisp = (vThreshold - dist) * 5.0;
+    zDisp = (vThreshold - dist) * 10.0;
   }
   mvPosition.z += zDisp;
   gl_PointSize = uSize;
