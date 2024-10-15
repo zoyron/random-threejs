@@ -1,198 +1,223 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-const vertexShader = `
-    uniform float uTextureWidth;
-    uniform float uTextureHeight;
+let scene, camera, renderer, controls;
+let grid = [];
+let cols = 10; // Reduced from 20
+let rows = 10; // Reduced from 20
+let layers = 10; // Reduced from 20
+let cellSize = 0.5; // Increased from 1
+let start, end;
+let openSet = [];
+let closedSet = [];
+let path = [];
+let current;
+let finished = false;
 
-    varying vec2 vUv;
-    varying vec2 vTextureCoord;
+// Apple-inspired color scheme
+const colors = {
+  bg: 0x0080fa,
+  cell: 0xffffff,
+  wall: 0xdcdce1,
+  openSet: 0x007aff,
+  closedSet: 0x5856d6,
+  path: 0xff9500,
+  start: 0x34c759,
+  end: 0xff3b30
+};
 
-    void main() {
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+// Reusable geometries
+const cellGeometry = new THREE.BoxGeometry(cellSize * 0.9, cellSize * 0.9, cellSize * 0.9);
+const wallGeometry = new THREE.BoxGeometry(cellSize, cellSize, cellSize);
 
-        vec2 textureCoord = vec4(position, 1.0).xy / vec2(uTextureWidth, uTextureHeight);
- 
-        vUv = uv;
-        vTextureCoord = textureCoord;
-    }
-`;
+// Reusable materials
+const cellMaterial = new THREE.MeshLambertMaterial({ color: colors.cell });
+const wallMaterial = new THREE.MeshLambertMaterial({ color: colors.wall });
+const openSetMaterial = new THREE.MeshLambertMaterial({ color: colors.openSet });
+const closedSetMaterial = new THREE.MeshLambertMaterial({ color: colors.closedSet });
+const startMaterial = new THREE.MeshLambertMaterial({ color: colors.start });
+const endMaterial = new THREE.MeshLambertMaterial({ color: colors.end });
 
-const fragmentShader = `
-    uniform float uFade;
-    uniform float uTime;
-    uniform sampler2D uTexture;
+function init() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(colors.bg);
 
-    varying vec2 vUv;
-    varying vec2 vTextureCoord;
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(cols * cellSize * -1.5, rows * cellSize*2, layers * cellSize * -1.5);
 
-    void main() {
-        vec4 textureSample = texture2D(uTexture, vTextureCoord);
-        vec3 color = textureSample.rgb;
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-        float wave = sin(uTime * 0.15) * 0.5 + 0.5;
-        float highlightLowerBound = wave - 0.025;
-        float highlightUpperBound = wave + 0.025;
-        wave = smoothstep(highlightLowerBound, wave, vUv.x) + 1.0 - smoothstep(wave, highlightUpperBound, vUv.x);
-        wave = (wave - 1.0) * 0.1;
+  controls = new OrbitControls(camera, renderer.domElement);
 
-        color = mix(color, vec3(1.0), wave);
+  // Add lighting
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  directionalLight.position.set(10, 20, 15);
+  scene.add(directionalLight);
 
-        float alpha = textureSample.a * step(vUv.x, uFade);
-
-        gl_FragColor = vec4(color, alpha);
-    }
-`;
-
-class ImageTraceLines {
-    constructor(imageUrl, options = {}) {
-        this.imageUrl = imageUrl;
-        this.options = {
-            numberLines: 400,
-            maxDistance: 11,
-            sampleSize: 2500,
-            brightnessThreshold: 6,
-            ...options
-        };
-
-        this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        this.renderer = new THREE.WebGLRenderer();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(this.renderer.domElement);
-
-        this.camera.position.z = 10;
-
-        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.target.set(0, 0.5, 0);
-
-        this.clock = new THREE.Clock();
-
-        this.init();
-    }
-
-    init() {
-        const loader = new THREE.TextureLoader();
-        loader.load(this.imageUrl, (texture) => {
-            this.createLines(texture);
-            this.animate();
-        });
-    }
-
-    createLines(texture) {
-        const { width, height } = texture.image;
-        const positions = this.getPositionsFromTexture(texture);
-        const lines = this.generateLines(positions);
-
-        const group = new THREE.Group();
-        group.scale.set(0.03, 0.03, 0.03);
-        group.position.set(-width / 2 * 0.03, -height / 2 * 0.03, 0);
-
-        lines.forEach(lineVertices => {
-            const curve = new THREE.CatmullRomCurve3(lineVertices);
-            const geometry = new THREE.TubeGeometry(curve, 50, 0.25, 6, false);
-            const material = new THREE.ShaderMaterial({
-                vertexShader,
-                fragmentShader,
-                uniforms: {
-                    uTime: { value: 0 },
-                    uFade: { value: 0 },
-                    uTexture: { value: texture },
-                    uTextureWidth: { value: width },
-                    uTextureHeight: { value: height },
-                },
-                transparent: true
-            });
-
-            const mesh = new THREE.Mesh(geometry, material);
-            group.add(mesh);
-        });
-
-        this.scene.add(group);
-    }
-
-    getPositionsFromTexture(texture) {
-        const { width, height } = texture.image;
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        canvas.width = width;
-        canvas.height = height;
-
-        ctx.drawImage(texture.image, 0, 0, width, height);
-
-        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const positions = [];
-
-        for (let i = 0; i < width * height; i++) {
-            const r = data[i * 4];
-            const g = data[i * 4 + 1];
-            const b = data[i * 4 + 2];
-            const brightness = (r + g + b) / 3;
-
-            if (brightness < this.options.brightnessThreshold) continue;
-
-            positions.push(new THREE.Vector3(i % width, Math.floor(i / width), brightness / 15));
-        }
-
-        return positions;
-    }
-
-    generateLines(positions) {
-        const lines = [];
-        const currentPoint = new THREE.Vector3();
-        const previousPoint = new THREE.Vector3();
-
-        for (let i = 0; i < this.options.numberLines; i++) {
-            const lineVertices = [];
-
-            currentPoint.copy(positions[Math.floor(Math.random() * positions.length)]);
-            previousPoint.copy(currentPoint);
-
-            for (let j = 0; j < this.options.sampleSize; j++) {
-                currentPoint.copy(positions[Math.floor(Math.random() * positions.length)]);
-
-                if (currentPoint.distanceTo(previousPoint) >= this.options.maxDistance) {
-                    continue;
-                }
-
-                lineVertices.push(currentPoint.clone());
-                previousPoint.copy(currentPoint);
-            }
-
-            if (lineVertices.length >= 3) {
-                lines.push(lineVertices);
-            }
-        }
-
-        return lines;
-    }
-
-    animate() {
-        requestAnimationFrame(() => this.animate());
-
-        const elapsedTime = this.clock.getElapsedTime();
-
-        this.scene.traverse(child => {
-            if (child instanceof THREE.Mesh && child.material instanceof THREE.ShaderMaterial) {
-                child.material.uniforms.uTime.value = elapsedTime;
-                child.material.uniforms.uFade.value = THREE.MathUtils.lerp(
-                    child.material.uniforms.uFade.value,
-                    1,
-                    0.02
-                );
-            }
-        });
-
-        this.controls.update();
-        this.renderer.render(this.scene, this.camera);
-    }
+  initializeGrid();
+  createMeshes();
+  animate();
 }
 
-// Usage
-const imageTraceLines = new ImageTraceLines('/krishna.jpg', {
-    numberLines: 4000,
-    maxDistance: 18,
-    sampleSize: 2500,
-    brightnessThreshold: 9
-});
+function initializeGrid() {
+  for (let i = 0; i < cols; i++) {
+    grid[i] = [];
+    for (let j = 0; j < rows; j++) {
+      grid[i][j] = [];
+      for (let k = 0; k < layers; k++) {
+        grid[i][j][k] = new Cell(i, j, k);
+        if (Math.random() < 0.3) {
+          grid[i][j][k].wall = true;
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < cols; i++) {
+    for (let j = 0; j < rows; j++) {
+      for (let k = 0; k < layers; k++) {
+        grid[i][j][k].addNeighbors(grid);
+      }
+    }
+  }
+
+  start = grid[0][0][0];
+  end = grid[cols-1][rows-1][layers-1];
+  start.wall = false;
+  end.wall = false;
+
+  openSet.push(start);
+}
+
+function createMeshes() {
+  for (let i = 0; i < cols; i++) {
+    for (let j = 0; j < rows; j++) {
+      for (let k = 0; k < layers; k++) {
+        const cell = grid[i][j][k];
+        if (cell.wall) {
+          cell.mesh = new THREE.Mesh(wallGeometry, wallMaterial);
+        } else {
+          cell.mesh = new THREE.Mesh(cellGeometry, cellMaterial);
+        }
+        cell.mesh.position.set(i * cellSize, j * cellSize, k * cellSize);
+        scene.add(cell.mesh);
+      }
+    }
+  }
+  start.mesh.material = startMaterial;
+  end.mesh.material = endMaterial;
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  updateAlgorithm();
+  render();
+}
+
+function updateAlgorithm() {
+  if (!finished && openSet.length > 0) {
+    current = openSet.reduce((a, b) => a.f < b.f ? a : b);
+
+    if (current === end) {
+      console.log("Path found!");
+      finished = true;
+      return;
+    }
+
+    openSet = openSet.filter(cell => cell !== current);
+    closedSet.push(current);
+
+    for (let neighbor of current.neighbors) {
+      if (!closedSet.includes(neighbor) && !neighbor.wall) {
+        let tempG = current.g + 1;
+
+        let newPath = false;
+        if (openSet.includes(neighbor)) {
+          if (tempG < neighbor.g) {
+            neighbor.g = tempG;
+            newPath = true;
+          }
+        } else {
+          neighbor.g = tempG;
+          newPath = true;
+          openSet.push(neighbor);
+        }
+
+        if (newPath) {
+          neighbor.h = heuristic(neighbor, end);
+          neighbor.f = neighbor.g + neighbor.h;
+          neighbor.previous = current;
+        }
+      }
+    }
+  } else if (!finished) {
+    console.log("No solution");
+    finished = true;
+    return;
+  }
+
+  path = [];
+  let temp = current;
+  while (temp.previous) {
+    path.push(temp);
+    temp = temp.previous;
+  }
+}
+
+function render() {
+  openSet.forEach(cell => cell.mesh.material = openSetMaterial);
+  closedSet.forEach(cell => cell.mesh.material = closedSetMaterial);
+  path.forEach(cell => cell.mesh.material = new THREE.MeshLambertMaterial({ color: colors.path }));
+
+  start.mesh.material = startMaterial;
+  end.mesh.material = endMaterial;
+
+  renderer.render(scene, camera);
+}
+
+class Cell {
+  constructor(i, j, k) {
+    this.i = i;
+    this.j = j;
+    this.k = k;
+    this.f = 0;
+    this.g = 0;
+    this.h = 0;
+    this.neighbors = [];
+    this.previous = undefined;
+    this.wall = false;
+    this.mesh = null;
+  }
+
+  addNeighbors(grid) {
+    let i = this.i;
+    let j = this.j;
+    let k = this.k;
+    
+    if (i < cols - 1) this.neighbors.push(grid[i+1][j][k]);
+    if (i > 0) this.neighbors.push(grid[i-1][j][k]);
+    if (j < rows - 1) this.neighbors.push(grid[i][j+1][k]);
+    if (j > 0) this.neighbors.push(grid[i][j-1][k]);
+    if (k < layers - 1) this.neighbors.push(grid[i][j][k+1]);
+    if (k > 0) this.neighbors.push(grid[i][j][k-1]);
+  }
+}
+
+function heuristic(a, b) {
+  return Math.abs(a.i - b.i)/2 + Math.abs(a.j - b.j) + Math.abs(a.k - b.k)/2;
+}
+
+init();
+
+// Handle window resizing
+window.addEventListener('resize', onWindowResize, false);
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
