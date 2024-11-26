@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import earthVertexShader from "./shaders/vertex.glsl";
+import earthFragmentShader from "./shaders/fragment.glsl";
 
 /**
  * Base setup
@@ -10,7 +12,7 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf0f0f0);
+// scene.background = new THREE.Color(0xf0f0f0);
 
 // Sizes
 const sizes = {
@@ -27,7 +29,7 @@ const camera = new THREE.PerspectiveCamera(
   75,
   sizes.width / sizes.height,
   0.1,
-  1000
+  1000,
 );
 camera.position.set(3, 3, 3);
 scene.add(camera);
@@ -35,11 +37,14 @@ scene.add(camera);
 /**
  * Adding a base mesh
  */
-const side = 1;
-const geometry = new THREE.BoxGeometry(side,side,side, 8, 8, 8);
-const material = new THREE.MeshNormalMaterial();
-const mesh = new THREE.Mesh(geometry, material);
-scene.add(mesh);
+const earthGeometry = new THREE.SphereGeometry(2, 64, 64);
+const earthMaterial = new THREE.ShaderMaterial({
+  vertexShader: earthVertexShader,
+  fragmentShader: earthFragmentShader,
+  uniforms: {},
+});
+const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+scene.add(earth);
 
 /**
  * Renderer and Resizing
@@ -76,8 +81,8 @@ controls.enableDamping = true;
 // Animate
 const animate = () => {
   // Rotate mesh
-  mesh.rotation.x += 0.0125;
-  mesh.rotation.y += 0.0125;
+  earth.rotation.x += 0.0125;
+  earth.rotation.y += 0.0125;
 
   // Update controls
   controls.update();
