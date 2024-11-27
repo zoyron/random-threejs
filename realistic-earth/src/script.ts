@@ -8,7 +8,7 @@ import earthFragmentShader from "./shaders/fragment.glsl";
  */
 
 // Canvas
-const canvas = document.querySelector("canvas.webgl");
+const canvas: HTMLElement = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
