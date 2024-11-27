@@ -12,7 +12,7 @@ const canvas = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
-// scene.background = new THREE.Color(0xf0f0f0);
+scene.background = new THREE.Color(0x0080fa);
 
 // Sizes
 const sizes = {
@@ -29,7 +29,7 @@ const camera = new THREE.PerspectiveCamera(
   75,
   sizes.width / sizes.height,
   0.1,
-  1000,
+  1000
 );
 camera.position.set(3, 3, 3);
 scene.add(camera);
@@ -37,7 +37,7 @@ scene.add(camera);
 /**
  * Adding a base mesh
  */
-const earthGeometry = new THREE.SphereGeometry(2, 64, 64);
+const earthGeometry = new THREE.SphereGeometry(1.5, 64, 64);
 const earthMaterial = new THREE.ShaderMaterial({
   vertexShader: earthVertexShader,
   fragmentShader: earthFragmentShader,
@@ -81,7 +81,7 @@ controls.enableDamping = true;
 // Animate
 const animate = () => {
   // Rotate mesh
-  earth.rotation.x += 0.0125;
+  // earth.rotation.x += 0.0125;
   earth.rotation.y += 0.0125;
 
   // Update controls
