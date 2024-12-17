@@ -1,223 +1,226 @@
 import * as THREE from 'three';
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
-let scene, camera, renderer, controls;
-let grid = [];
-let cols = 10; // Reduced from 20
-let rows = 10; // Reduced from 20
-let layers = 10; // Reduced from 20
-let cellSize = 0.5; // Increased from 1
-let start, end;
-let openSet = [];
-let closedSet = [];
-let path = [];
-let current;
-let finished = false;
+class ParticleCloud {
+  constructor() {
+    // Scene setup
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    this.renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      alpha: true 
+    });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setClearColor(0x000000, 1);
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.5;
+    document.body.appendChild(this.renderer.domElement);
 
-// Apple-inspired color scheme
-const colors = {
-  bg: 0x0080fa,
-  cell: 0xffffff,
-  wall: 0xdcdce1,
-  openSet: 0x007aff,
-  closedSet: 0x5856d6,
-  path: 0xff9500,
-  start: 0x34c759,
-  end: 0xff3b30
-};
+    // Camera position and controls
+    this.camera.position.z = 5;
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.05;
 
-// Reusable geometries
-const cellGeometry = new THREE.BoxGeometry(cellSize * 0.9, cellSize * 0.9, cellSize * 0.9);
-const wallGeometry = new THREE.BoxGeometry(cellSize, cellSize, cellSize);
+    // Post-processing setup
+    this.composer = new EffectComposer(this.renderer);
+    const renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(renderPass);
 
-// Reusable materials
-const cellMaterial = new THREE.MeshLambertMaterial({ color: colors.cell });
-const wallMaterial = new THREE.MeshLambertMaterial({ color: colors.wall });
-const openSetMaterial = new THREE.MeshLambertMaterial({ color: colors.openSet });
-const closedSetMaterial = new THREE.MeshLambertMaterial({ color: colors.closedSet });
-const startMaterial = new THREE.MeshLambertMaterial({ color: colors.start });
-const endMaterial = new THREE.MeshLambertMaterial({ color: colors.end });
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      1.5,  // strength
+      0.4,  // radius
+      0.1   // threshold
+    );
+    this.composer.addPass(bloomPass);
 
-function init() {
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(colors.bg);
-
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(cols * cellSize * -1.5, rows * cellSize*2, layers * cellSize * -1.5);
-
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  controls = new OrbitControls(camera, renderer.domElement);
-
-  // Add lighting
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambientLight);
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(10, 20, 15);
-  scene.add(directionalLight);
-
-  initializeGrid();
-  createMeshes();
-  animate();
-}
-
-function initializeGrid() {
-  for (let i = 0; i < cols; i++) {
-    grid[i] = [];
-    for (let j = 0; j < rows; j++) {
-      grid[i][j] = [];
-      for (let k = 0; k < layers; k++) {
-        grid[i][j][k] = new Cell(i, j, k);
-        if (Math.random() < 0.3) {
-          grid[i][j][k].wall = true;
-        }
-      }
-    }
-  }
-
-  for (let i = 0; i < cols; i++) {
-    for (let j = 0; j < rows; j++) {
-      for (let k = 0; k < layers; k++) {
-        grid[i][j][k].addNeighbors(grid);
-      }
-    }
-  }
-
-  start = grid[0][0][0];
-  end = grid[cols-1][rows-1][layers-1];
-  start.wall = false;
-  end.wall = false;
-
-  openSet.push(start);
-}
-
-function createMeshes() {
-  for (let i = 0; i < cols; i++) {
-    for (let j = 0; j < rows; j++) {
-      for (let k = 0; k < layers; k++) {
-        const cell = grid[i][j][k];
-        if (cell.wall) {
-          cell.mesh = new THREE.Mesh(wallGeometry, wallMaterial);
-        } else {
-          cell.mesh = new THREE.Mesh(cellGeometry, cellMaterial);
-        }
-        cell.mesh.position.set(i * cellSize, j * cellSize, k * cellSize);
-        scene.add(cell.mesh);
-      }
-    }
-  }
-  start.mesh.material = startMaterial;
-  end.mesh.material = endMaterial;
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-  updateAlgorithm();
-  render();
-}
-
-function updateAlgorithm() {
-  if (!finished && openSet.length > 0) {
-    current = openSet.reduce((a, b) => a.f < b.f ? a : b);
-
-    if (current === end) {
-      console.log("Path found!");
-      finished = true;
-      return;
-    }
-
-    openSet = openSet.filter(cell => cell !== current);
-    closedSet.push(current);
-
-    for (let neighbor of current.neighbors) {
-      if (!closedSet.includes(neighbor) && !neighbor.wall) {
-        let tempG = current.g + 1;
-
-        let newPath = false;
-        if (openSet.includes(neighbor)) {
-          if (tempG < neighbor.g) {
-            neighbor.g = tempG;
-            newPath = true;
-          }
-        } else {
-          neighbor.g = tempG;
-          newPath = true;
-          openSet.push(neighbor);
-        }
-
-        if (newPath) {
-          neighbor.h = heuristic(neighbor, end);
-          neighbor.f = neighbor.g + neighbor.h;
-          neighbor.previous = current;
-        }
-      }
-    }
-  } else if (!finished) {
-    console.log("No solution");
-    finished = true;
-    return;
-  }
-
-  path = [];
-  let temp = current;
-  while (temp.previous) {
-    path.push(temp);
-    temp = temp.previous;
-  }
-}
-
-function render() {
-  openSet.forEach(cell => cell.mesh.material = openSetMaterial);
-  closedSet.forEach(cell => cell.mesh.material = closedSetMaterial);
-  path.forEach(cell => cell.mesh.material = new THREE.MeshLambertMaterial({ color: colors.path }));
-
-  start.mesh.material = startMaterial;
-  end.mesh.material = endMaterial;
-
-  renderer.render(scene, camera);
-}
-
-class Cell {
-  constructor(i, j, k) {
-    this.i = i;
-    this.j = j;
-    this.k = k;
-    this.f = 0;
-    this.g = 0;
-    this.h = 0;
-    this.neighbors = [];
-    this.previous = undefined;
-    this.wall = false;
-    this.mesh = null;
-  }
-
-  addNeighbors(grid) {
-    let i = this.i;
-    let j = this.j;
-    let k = this.k;
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x111111);
+    this.scene.add(ambientLight);
     
-    if (i < cols - 1) this.neighbors.push(grid[i+1][j][k]);
-    if (i > 0) this.neighbors.push(grid[i-1][j][k]);
-    if (j < rows - 1) this.neighbors.push(grid[i][j+1][k]);
-    if (j > 0) this.neighbors.push(grid[i][j-1][k]);
-    if (k < layers - 1) this.neighbors.push(grid[i][j][k+1]);
-    if (k > 0) this.neighbors.push(grid[i][j][k-1]);
+    const pointLight = new THREE.PointLight(0x88ccff, 1);
+    pointLight.position.set(5, 5, 5);
+    this.scene.add(pointLight);
+
+    // Group for all particles
+    this.group = new THREE.Group();
+    this.scene.add(this.group);
+
+    // Mouse tracking with raycaster
+    this.mouse = new THREE.Vector3();
+    this.raycaster = new THREE.Raycaster();
+    this.mousePos = new THREE.Vector2();
+    this.viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+
+    // Initialize particles
+    this.particles = this.createParticles();
+    
+    // Interactive parameters
+    this.interactionRadius = 1.5;
+    this.maxGlowIntensity = 5;
+    this.baseGlowIntensity = 0.5;
+    this.dispersalForce = 0.08;
+    this.returnForce = 0.02;
+    this.dampingFactor = 0.95;
+    this.rotationSpeed = 0.0025;
+
+    // Event listeners
+    window.addEventListener('resize', this.onWindowResize.bind(this));
+    window.addEventListener('mousemove', this.onMouseMove.bind(this));
+    
+    // Start animation loop
+    this.animate();
+  }
+
+  createParticles() {
+    const particles = [];
+    const count = 4500;
+    const radius = 2;
+    
+    const geometry = new THREE.SphereGeometry(0.015, 12, 12);
+    
+    // Base colors for particles
+    const colors = [
+      0x88ccff,  // Light blue
+      0x7dabf1,  // Medium blue
+      0x6a8dff   // Deep blue
+    ];
+
+    for (let i = 0; i < count; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const x = radius * Math.sin(phi) * Math.cos(theta);
+      const y = radius * Math.sin(phi) * Math.sin(theta);
+      const z = radius * Math.cos(phi);
+      
+      const position = new THREE.Vector3(x, y, z);
+      
+      // Create material with emissive color
+      const baseColor = colors[Math.floor(Math.random() * colors.length)];
+      const material = new THREE.MeshStandardMaterial({
+        color: baseColor,
+        emissive: baseColor,
+        emissiveMap: null,
+        metalness: 0.5,
+        roughness: 0.2,
+        toneMapped: false
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(position);
+      
+      this.group.add(mesh);
+      
+      particles.push({
+        mesh,
+        position: position.clone(),
+        originalPosition: position.clone(),
+        velocity: new THREE.Vector3(),
+        quaternion: new THREE.Quaternion(),
+        baseColor: new THREE.Color(baseColor),
+        currentIntensity: this.baseGlowIntensity
+      });
+    }
+    
+    return particles;
+  }
+
+  updateParticles() {
+    this.raycaster.setFromCamera(this.mousePos, this.camera);
+    const intersectPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const mousePosition3D = new THREE.Vector3();
+    this.raycaster.ray.intersectPlane(intersectPlane, mousePosition3D);
+
+    this.particles.forEach(particle => {
+      const distanceToMouse = mousePosition3D.distanceTo(particle.position);
+      const isInRange = distanceToMouse < this.interactionRadius;
+      
+      const force = isInRange 
+        ? this.dispersalForce * (1 - distanceToMouse / this.interactionRadius)
+        : 0;
+
+      if (isInRange) {
+        const repulsionDir = particle.position.clone()
+          .sub(mousePosition3D)
+          .normalize();
+        
+        particle.velocity.add(
+          repulsionDir.multiplyScalar(force * (1 + Math.random() * 0.2))
+        );
+        
+        // Calculate intensity based on distance
+        const intensity = THREE.MathUtils.lerp(
+          this.maxGlowIntensity,
+          this.baseGlowIntensity,
+          distanceToMouse / this.interactionRadius
+        );
+        
+        // Update material emissive intensity
+        const glowColor = particle.baseColor.clone().multiplyScalar(intensity);
+        particle.mesh.material.emissive = glowColor;
+      } else {
+        // Reset to base glow
+        particle.mesh.material.emissive = particle.baseColor.clone().multiplyScalar(this.baseGlowIntensity);
+      }
+
+      const distanceToOrigin = particle.position.distanceTo(particle.originalPosition);
+      const returnForce = particle.originalPosition
+        .clone()
+        .sub(particle.position)
+        .normalize()
+        .multiplyScalar(this.returnForce * distanceToOrigin);
+      
+      particle.velocity.add(returnForce);
+      particle.velocity.multiplyScalar(this.dampingFactor);
+      
+      particle.position.add(particle.velocity);
+      particle.mesh.position.copy(particle.position);
+
+      if (particle.velocity.length() > 0.001) {
+        particle.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          particle.velocity.clone().normalize()
+        );
+        particle.mesh.quaternion.slerp(particle.quaternion, 0.1);
+      }
+    });
+
+    this.group.rotation.y += this.rotationSpeed;
+  }
+
+  onWindowResize() {
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+    this.viewport.width = window.innerWidth;
+    this.viewport.height = window.innerHeight;
+  }
+
+  onMouseMove(event) {
+    this.mousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
+    this.mousePos.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  }
+
+  animate() {
+    requestAnimationFrame(this.animate.bind(this));
+    this.updateParticles();
+    this.controls.update();
+    this.composer.render();
   }
 }
 
-function heuristic(a, b) {
-  return Math.abs(a.i - b.i)/2 + Math.abs(a.j - b.j) + Math.abs(a.k - b.k)/2;
-}
-
-init();
-
-// Handle window resizing
-window.addEventListener('resize', onWindowResize, false);
-
-function onWindowResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
+// Initialize the application
+new ParticleCloud();

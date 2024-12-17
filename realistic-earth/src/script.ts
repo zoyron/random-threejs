@@ -12,7 +12,7 @@ const canvas: HTMLElement = document.querySelector("canvas.webgl");
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0080fa);
+scene.background = new THREE.Color("#696969");
 
 // Sizes
 const sizes = {
