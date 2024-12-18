@@ -86,7 +86,7 @@ class ParticleCloud {
 
   createParticles() {
     const particles = [];
-    const count = 4500;
+    const count = 5000;
     const radius = 2;
     
     const geometry = new THREE.SphereGeometry(0.015, 12, 12);
