@@ -27,9 +27,7 @@ class ParticleCloud {
 
     // Parameters for GUI
     this.params = {
-      color1: '#88ccff',
-      color2: '#7dabf1',
-      color3: '#6a8dff',
+      color: '#88ccff',
       updateColors: () => this.updateParticleColors()
     };
 
@@ -98,20 +96,15 @@ class ParticleCloud {
 
   initGUI() {
     const gui = new GUI();
-    const colorFolder = gui.addFolder('Particle Colors');
-    
-    colorFolder.addColor(this.params, 'color1').name('Color 1').onChange(() => this.updateParticleColors());
-    colorFolder.addColor(this.params, 'color2').name('Color 2').onChange(() => this.updateParticleColors());
-    colorFolder.addColor(this.params, 'color3').name('Color 3').onChange(() => this.updateParticleColors());
-    
-    colorFolder.open();
+    gui.addColor(this.params, 'color').name('Particle Color').onChange(() => this.updateParticleColors());
   }
 
   updateParticleColors() {
+    const baseColor = new THREE.Color(this.params.color);
     const colors = [
-      new THREE.Color(this.params.color1),
-      new THREE.Color(this.params.color2),
-      new THREE.Color(this.params.color3)
+      baseColor,
+      baseColor.clone().multiplyScalar(0.9),
+      baseColor.clone().multiplyScalar(0.8)
     ];
 
     this.particles.forEach((particle, index) => {
@@ -129,11 +122,11 @@ class ParticleCloud {
     
     const geometry = new THREE.SphereGeometry(0.015, 12, 12);
     
-    // Base colors for particles
+    const baseColor = new THREE.Color(this.params.color);
     const colors = [
-      new THREE.Color(this.params.color1),
-      new THREE.Color(this.params.color2),
-      new THREE.Color(this.params.color3)
+      baseColor,
+      baseColor.clone().multiplyScalar(0.9),
+      baseColor.clone().multiplyScalar(0.8)
     ];
 
     for (let i = 0; i < count; i++) {
@@ -145,7 +138,6 @@ class ParticleCloud {
       
       const position = new THREE.Vector3(x, y, z);
       
-      // Create material with emissive color
       const baseColor = colors[i % colors.length];
       const material = new THREE.MeshStandardMaterial({
         color: baseColor,
