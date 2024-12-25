@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { GUI } from 'lil-gui';
 
 class ParticleCloud {
   constructor() {
@@ -24,6 +25,14 @@ class ParticleCloud {
     this.renderer.toneMappingExposure = 1.5;
     document.body.appendChild(this.renderer.domElement);
 
+    // Parameters for GUI
+    this.params = {
+      color1: '#88ccff',
+      color2: '#7dabf1',
+      color3: '#6a8dff',
+      updateColors: () => this.updateParticleColors()
+    };
+
     // Camera position and controls
     this.camera.position.z = 5;
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -37,9 +46,9 @@ class ParticleCloud {
 
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      1.5,  // strength
-      0.4,  // radius
-      0.1   // threshold
+      1.5,
+      0.4,
+      0.1
     );
     this.composer.addPass(bloomPass);
 
@@ -64,6 +73,9 @@ class ParticleCloud {
       height: window.innerHeight
     };
 
+    // Initialize GUI
+    this.initGUI();
+
     // Initialize particles
     this.particles = this.createParticles();
     
@@ -84,6 +96,32 @@ class ParticleCloud {
     this.animate();
   }
 
+  initGUI() {
+    const gui = new GUI();
+    const colorFolder = gui.addFolder('Particle Colors');
+    
+    colorFolder.addColor(this.params, 'color1').name('Color 1').onChange(() => this.updateParticleColors());
+    colorFolder.addColor(this.params, 'color2').name('Color 2').onChange(() => this.updateParticleColors());
+    colorFolder.addColor(this.params, 'color3').name('Color 3').onChange(() => this.updateParticleColors());
+    
+    colorFolder.open();
+  }
+
+  updateParticleColors() {
+    const colors = [
+      new THREE.Color(this.params.color1),
+      new THREE.Color(this.params.color2),
+      new THREE.Color(this.params.color3)
+    ];
+
+    this.particles.forEach((particle, index) => {
+      const colorIndex = index % 3;
+      particle.baseColor = colors[colorIndex];
+      particle.mesh.material.color = colors[colorIndex];
+      particle.mesh.material.emissive = colors[colorIndex].clone().multiplyScalar(this.baseGlowIntensity);
+    });
+  }
+
   createParticles() {
     const particles = [];
     const count = 5000;
@@ -93,9 +131,9 @@ class ParticleCloud {
     
     // Base colors for particles
     const colors = [
-      0x88ccff,  // Light blue
-      0x7dabf1,  // Medium blue
-      0x6a8dff   // Deep blue
+      new THREE.Color(this.params.color1),
+      new THREE.Color(this.params.color2),
+      new THREE.Color(this.params.color3)
     ];
 
     for (let i = 0; i < count; i++) {
@@ -108,7 +146,7 @@ class ParticleCloud {
       const position = new THREE.Vector3(x, y, z);
       
       // Create material with emissive color
-      const baseColor = colors[Math.floor(Math.random() * colors.length)];
+      const baseColor = colors[i % colors.length];
       const material = new THREE.MeshStandardMaterial({
         color: baseColor,
         emissive: baseColor,
@@ -129,7 +167,7 @@ class ParticleCloud {
         originalPosition: position.clone(),
         velocity: new THREE.Vector3(),
         quaternion: new THREE.Quaternion(),
-        baseColor: new THREE.Color(baseColor),
+        baseColor: baseColor.clone(),
         currentIntensity: this.baseGlowIntensity
       });
     }
@@ -160,18 +198,15 @@ class ParticleCloud {
           repulsionDir.multiplyScalar(force * (1 + Math.random() * 0.2))
         );
         
-        // Calculate intensity based on distance
         const intensity = THREE.MathUtils.lerp(
           this.maxGlowIntensity,
           this.baseGlowIntensity,
           distanceToMouse / this.interactionRadius
         );
         
-        // Update material emissive intensity
         const glowColor = particle.baseColor.clone().multiplyScalar(intensity);
         particle.mesh.material.emissive = glowColor;
       } else {
-        // Reset to base glow
         particle.mesh.material.emissive = particle.baseColor.clone().multiplyScalar(this.baseGlowIntensity);
       }
 
