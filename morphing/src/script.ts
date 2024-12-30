@@ -113,25 +113,44 @@ gltfLoader.load("./models.glb", (gltf) => {
    * more specifically, we want the "position" attribute of the models
    */
   // Positions
-  // the purpose of the map function is to return something new from the array, to exract something from each child element in the array
-  gltf.scene.children.map((child) => {
-    console.log(child);
-  });
+  // the purpose of the map function is to return something new from the array, to extract something from each child element in the array
+  const positions: Array<Float32Array> = gltf.scene.children
+    .filter(
+      (child): child is THREE.Mesh =>
+        (child as THREE.Mesh).geometry !== undefined
+    )
+    .map((child: THREE.Mesh) => {
+      const positionArray = child.geometry.attributes.position
+        .array as Float32Array;
+      // Check for NaN values in the position array
+      for (let i = 0; i < positionArray.length; i++) {
+        if (isNaN(positionArray[i])) {
+          console.error(`NaN value found in position array at index ${i}`);
+          return new Float32Array(); // Return an empty array to avoid issues
+        }
+      }
+      return positionArray;
+    });
+
+  particles.maxCount = 0;
+
+  // setting the same number of positions for each model.
+  // setting each to max number of positions
+  for (const position of positions) {
+    if (position.length / 3 > particles.maxCount)
+      // Divide by 3 because each vertex has 3 coordinates (x, y, z)
+      particles.maxCount = position.length / 3;
+  }
 
   // Geometry
-  particles.geometry = new THREE.SphereGeometry(3);
-  particles.geometry.setIndex(null);
+  particles.geometry = new THREE.BufferGeometry();
+  particles.geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(new Float32Array(particles.maxCount * 3), 3)
+  );
 
-  /**
-   * The idea is that we are going to send 2 sets of positions to vertex shader.
-   *
-   * Currently, the sphere we have is just one set of positions.
-   * Sphere particles will be named "position" because vertex shader expects one argument to be named "position", so why not just give the starting figure that variable name. This would be marked as the initial shape.
-   *
-   * And the shape we are targetting to morph into would be named as "aTargetPosition" while sending the position attributes of the new shape to the vertex shaders.
-   *
-   * And to morph between the two shapes, we will be using a uniform named "uProgress" that will range from 0 to 1, and will be used to mix between the two shapes
-   */
+  // Compute bounding sphere
+  particles.geometry.computeBoundingSphere();
 
   // Material
   particles.material = new THREE.ShaderMaterial({
