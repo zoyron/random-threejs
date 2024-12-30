@@ -1,61 +1,58 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import GUI from "lil-gui";
+import particlesVertexShader from "./shaders/vertex.glsl";
+import particlesFragmentShader from "./shaders/fragment.glsl";
 
 /**
- * Base setup
+ * Base
  */
+// Debug
+const gui = new GUI({ width: 340 });
+const debugObject = {
+  clearColor: "#160920",
+};
 
 // Canvas
-const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
+const canvas = document.querySelector(
+  "canvas.webgl"
+) as HTMLCanvasElement | null;
+
+if (!canvas) {
+  throw new Error("Canvas element not found");
+}
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf0f0f0);
 
-// Sizes
+// Loaders
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath("./draco/");
+const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
+
+/**
+ * Sizes
+ */
 const sizes = {
   width: window.innerWidth,
   height: window.innerHeight,
+  pixelRatio: Math.min(window.devicePixelRatio, 2),
 };
 
-/**
- * Camera and lights(optional)
- */
-
-// Perspective Camera
-const camera = new THREE.PerspectiveCamera(
-  75,
-  sizes.width / sizes.height,
-  0.1,
-  1000
-);
-camera.position.set(3, 3, 3);
-scene.add(camera);
-
-/**
- * Adding a base mesh
- */
-const side = 1;
-const geometry = new THREE.BoxGeometry(side, side, side, 8, 8, 8);
-const material = new THREE.MeshNormalMaterial();
-const mesh = new THREE.Mesh(geometry, material);
-scene.add(mesh);
-
-/**
- * Renderer and Resizing
- */
-// renderer
-const renderer = new THREE.WebGLRenderer({
-  canvas: canvas,
-});
-renderer.setSize(sizes.width, sizes.height);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-// Resizing
 window.addEventListener("resize", () => {
   // Update sizes
   sizes.width = window.innerWidth;
   sizes.height = window.innerHeight;
+  sizes.pixelRatio = Math.min(window.devicePixelRatio, 2);
+
+  // Materials
+  particles.material.uniforms.uResolution.value.set(
+    sizes.width * sizes.pixelRatio,
+    sizes.height * sizes.pixelRatio
+  );
 
   // Update camera
   camera.aspect = sizes.width / sizes.height;
@@ -63,26 +60,83 @@ window.addEventListener("resize", () => {
 
   // Update renderer
   renderer.setSize(sizes.width, sizes.height);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(sizes.pixelRatio);
 });
 
 /**
- * Animate and controls
+ * Camera
  */
+// Base camera
+const camera = new THREE.PerspectiveCamera(
+  35,
+  sizes.width / sizes.height,
+  0.1,
+  100
+);
+camera.position.set(0, 0, 8 * 2);
+scene.add(camera);
+
 // Controls
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 
-// Animate
-const animate = () => {
-  // Rotate mesh
-  mesh.rotation.x += 0.0125;
-  mesh.rotation.y += 0.0125;
+/**
+ * Renderer
+ */
+const renderer = new THREE.WebGLRenderer({
+  canvas: canvas,
+  antialias: true,
+});
 
+renderer.setSize(sizes.width, sizes.height);
+renderer.setPixelRatio(sizes.pixelRatio);
+
+gui.addColor(debugObject, "clearColor").onChange(() => {
+  renderer.setClearColor(debugObject.clearColor);
+});
+renderer.setClearColor(debugObject.clearColor);
+
+/**
+ * Particles
+ * instead of creating just a particles variable, we created it an object
+ * since, lil-gui only acts on objects, hence this is done so that we can use lil-gui to morph it into other things
+ */
+const particles: any = {};
+
+// Geometry
+particles.geometry = new THREE.SphereGeometry(3);
+
+/**
+ * The idea
+ */
+
+// Material
+particles.material = new THREE.ShaderMaterial({
+  vertexShader: particlesVertexShader,
+  fragmentShader: particlesFragmentShader,
+  uniforms: {
+    uSize: new THREE.Uniform(0.4),
+    uResolution: new THREE.Uniform(
+      new THREE.Vector2(
+        sizes.width * sizes.pixelRatio,
+        sizes.height * sizes.pixelRatio
+      )
+    ),
+  },
+});
+
+// Points
+particles.points = new THREE.Points(particles.geometry, particles.material);
+scene.add(particles.points);
+
+/**
+ * Animate
+ */
+const animate = () => {
   // Update controls
   controls.update();
 
-  // Adding renderer
+  // Render normal scene
   renderer.render(scene, camera);
 
   // Call animate again on the next frame
