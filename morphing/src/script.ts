@@ -6,7 +6,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
  */
 
 // Canvas
-const canvas = document.querySelector("canvas.webgl");
+const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
 
 // Scene
 const scene = new THREE.Scene();
@@ -36,7 +36,7 @@ scene.add(camera);
  * Adding a base mesh
  */
 const side = 1;
-const geometry = new THREE.BoxGeometry(side,side,side, 8, 8, 8);
+const geometry = new THREE.BoxGeometry(side, side, side, 8, 8, 8);
 const material = new THREE.MeshNormalMaterial();
 const mesh = new THREE.Mesh(geometry, material);
 scene.add(mesh);
