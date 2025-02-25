@@ -47,7 +47,7 @@ const alphaMap = textureLoader.load("/earthspec1k.jpg");
  */
 
 // points mesh
-const vert = 200;
+const vert = 300;
 // const pointsGeometry = new THREE.SphereGeometry(2.5, vert, vert, vert);
 const pointsGeometry = new THREE.IcosahedronGeometry(2.75, vert);
 
@@ -56,10 +56,7 @@ const pointsMaterial = new THREE.ShaderMaterial({
   transparent: true,
   uniforms: {
     uTime: { value: 0.0 },
-    uSize: { value: 3.0 },
-    uColorMap: { value: colorMap },
-    uElevationMap: { value: elevationMap },
-    uAlphaMap: { value: alphaMap },
+    uSize: { value: 1.0 },
   },
   vertexShader: vertexShader,
   fragmentShader: fragmentShader,
