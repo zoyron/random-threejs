@@ -41,10 +41,12 @@ window.addEventListener("resize", () => {
   sizes.pixelRatio = Math.min(window.devicePixelRatio, 2);
 
   // Materials
-  particles.material.uniforms.uResolution.value.set(
-    sizes.width * sizes.pixelRatio,
-    sizes.height * sizes.pixelRatio
-  );
+  if (particles && particles.material) {
+    particles.material.uniforms.uResolution.value.set(
+      sizes.width * sizes.pixelRatio,
+      sizes.height * sizes.pixelRatio
+    );
+  }
 
   // Update camera
   camera.aspect = sizes.width / sizes.height;
@@ -93,6 +95,7 @@ let particles = null;
 // Load Models
 gltfLoader.load("./models.glb", (gltf) => {
   particles = {};
+  particles.index = 0;
 
   // Extract model positions
   const positions = gltf.scene.children.map((child) => {
@@ -130,7 +133,10 @@ gltfLoader.load("./models.glb", (gltf) => {
 
   // Geometry
   particles.geometry = new THREE.BufferGeometry();
-  particles.geometry.setAttribute("position", particles.positions[0]);
+  particles.geometry.setAttribute(
+    "position",
+    particles.positions[particles.index]
+  );
   particles.geometry.setAttribute("aPositionTarget", particles.positions[1]);
 
   // Material
@@ -155,6 +161,41 @@ gltfLoader.load("./models.glb", (gltf) => {
   particles.points = new THREE.Points(particles.geometry, particles.material);
   scene.add(particles.points);
 
+  // Morphing methods
+  particles.morph = (index) => {
+    // update attributes
+    particles.geometry.attributes.position =
+      particles.positions[particles.index];
+
+    particles.geometry.attributes.aPositionTarget = particles.positions[index];
+
+    // animate uProgress
+    gsap.fromTo(
+      particles.material.uniforms.uProgress,
+      { value: 0 },
+      { value: 1, duration: 3, ease: "linear" }
+    );
+
+    // Save index
+    particles.index = index;
+  };
+
+  particles.morph0 = () => {
+    particles.morph(0);
+  };
+
+  particles.morph1 = () => {
+    particles.morph(1);
+  };
+
+  particles.morph2 = () => {
+    particles.morph(2);
+  };
+
+  particles.morph3 = () => {
+    particles.morph(3);
+  };
+
   // GUI tweaks
   gui
     .add(particles.material.uniforms.uProgress, "value")
@@ -162,6 +203,12 @@ gltfLoader.load("./models.glb", (gltf) => {
     .max(1)
     .step(0.001)
     .name("Mix");
+
+  // Add GUI controls AFTER particles object is fully initialized
+  gui.add(particles, "morph0").name("Morph to 0");
+  gui.add(particles, "morph1").name("Morph to 1");
+  gui.add(particles, "morph2").name("Morph to 2");
+  gui.add(particles, "morph3").name("Morph to 3");
 });
 
 /**
