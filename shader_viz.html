@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Three.js Shader Visual</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+<script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+
+    // Scene Setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const renderer = new THREE.WebGLRenderer({ antialias: false });
+    // Force at least 2.0 pixel ratio for supersampling (High Def)
+    renderer.setPixelRatio(Math.max(window.devicePixelRatio, 2.0));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Ping-Pong Buffers for Feedback (Backbuffer)
+    const size = new THREE.Vector2();
+    renderer.getDrawingBufferSize(size);
+    const targetOptions = {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        type: THREE.FloatType, // Float textures for high precision (tanh)
+    };
+    let currentTarget = new THREE.WebGLRenderTarget(size.x, size.y, targetOptions);
+    let prevTarget = new THREE.WebGLRenderTarget(size.x, size.y, targetOptions);
+
+    // Shader Code
+    const fragmentShader = `
+        precision highp float;
+        uniform vec2 resolution;
+        uniform float time;
+        uniform sampler2D backbuffer;
+        uniform int frame;
+
+        void main() {
+            vec2 r = resolution;
+            float t = time;
+            vec4 FC = gl_FragCoord;
+            vec4 o = vec4(0.0);
+
+            // Corrected loop and variable logic from the snippet
+            // vec2 p=(FC.xy*2.-r)/r.y/.3
+            vec2 p = (FC.xy * 2.0 - r) / r.y / 0.3;
+            vec2 v;
+
+            // Outer loop: for(float i,l,f;i++<9.; ... )
+            for(float i = 0.0; i < 9.0; i++) {
+                float l;
+                float f;
+                
+                // Inner loop: for(v=p,f=0.;f++<9.; ... )
+                v = p;
+                for(float f_iter = 0.0; f_iter < 9.0; f_iter++) {
+                    f = f_iter + 1.0; // f starts at 1.0
+                    // v+=sin(ceil(v.yx*f+i*.3)+r-t/2.)/f
+                    v += sin(ceil(v.yx * f + i * 0.3) + r - t / 2.0) / f;
+                }
+
+                // l=dot(p,p)-5.-2./v.y
+                l = dot(p, p) - 5.0 - 2.0 / v.y;
+
+                // o+=.1/abs(l)*(cos(i/3.+.1/l+vec4(1,2,3,4))+1.)
+                o += 0.1 / abs(l) * (cos(i / 3.0 + 0.1 / l + vec4(1.0, 2.0, 3.0, 4.0)) + 1.0);
+            }
+
+            // Feedback Logic
+            // o=max(tanh(o+(o=texture(b,(FC.xy+r.y*.04*sin(FC.xy+FC.yx/.6))/r))*o),.0);
+            
+            // Calculate distorted UV for backbuffer sampling
+            vec2 uv_distorted = (FC.xy + r.y * 0.04 * sin(FC.xy + FC.yx / 0.6)) / r;
+            
+            // Sample backbuffer (texture b)
+            vec4 b_color = texture(backbuffer, uv_distorted);
+
+            // Emulate the logic: tanh(o_current + b_color * o_current)
+            // Note: The original snippet's assignment order (o=texture...)*o is ambiguous.
+            // We assume it blends the new pattern (o) with the previous frame (b_color)
+            // modulated by the pattern itself.
+            
+            // If frame 0, no backbuffer
+            if (frame == 0) {
+                o = max(tanh(o), 0.0);
+            } else {
+                o = max(tanh(o + b_color * o), 0.0);
+            }
+
+            gl_FragColor = o;
+        }
+    `;
+
+    const material = new THREE.ShaderMaterial({
+        uniforms: {
+            resolution: { value: new THREE.Vector2(size.x, size.y) },
+            time: { value: 0.0 },
+            backbuffer: { value: null },
+            frame: { value: 0 }
+        },
+        vertexShader: `
+            void main() {
+                gl_Position = vec4( position, 1.0 );
+            }
+        `,
+        fragmentShader: fragmentShader
+    });
+
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+    scene.add(quad);
+
+    // Animation Loop
+    let frameCount = 0;
+    const startTime = performance.now();
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        const currentTime = (performance.now() - startTime) / 1000;
+        
+        material.uniforms.time.value = currentTime;
+        renderer.getDrawingBufferSize(size);
+        material.uniforms.resolution.value.set(size.x, size.y);
+        material.uniforms.frame.value = frameCount;
+
+        // 1. Set backbuffer uniform to the result of the LAST frame (prevTarget)
+        material.uniforms.backbuffer.value = prevTarget.texture;
+
+        // 2. Render to currentTarget
+        renderer.setRenderTarget(currentTarget);
+        renderer.render(scene, camera);
+
+        // 3. Render to Screen (visualize currentTarget)
+        renderer.setRenderTarget(null);
+        // To display, we can just render the same quad again, 
+        // but pointing the uniform to the texture we just rendered?
+        // Actually, simplest is to just blit currentTarget to screen.
+        // Or re-render scene to screen? Re-rendering calculates shader twice per frame. Expensive.
+        // Efficient way: Create a simple CopyShader for the screen pass.
+        // For this single-file setup, we'll use a simple trick: 
+        // We already rendered to 'currentTarget'. Now we want to show it.
+        // We can use a separate scene/quad for the copy pass.
+        copyToScreen(currentTarget.texture);
+
+        // 4. Swap buffers
+        const temp = currentTarget;
+        currentTarget = prevTarget;
+        prevTarget = temp;
+
+        frameCount++;
+    }
+
+    // Copy Pass Setup
+    const copyScene = new THREE.Scene();
+    const copyMaterial = new THREE.MeshBasicMaterial({ map: null });
+    const copyQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), copyMaterial);
+    copyScene.add(copyQuad);
+
+    function copyToScreen(texture) {
+        copyMaterial.map = texture;
+        renderer.render(copyScene, camera);
+    }
+
+    // Resize Handler
+    window.addEventListener('resize', () => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        renderer.setSize(w, h);
+        renderer.getDrawingBufferSize(size);
+        currentTarget.setSize(size.x, size.y);
+        prevTarget.setSize(size.x, size.y);
+        material.uniforms.resolution.value.set(size.x, size.y);
+    });
+
+    animate();
+</script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  overflow: hidden;
+  background: #000;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+#webgl {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+#video {
+  display: none;
+}
+
+#hand-canvas {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 220px;
+  height: 165px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 100;
+  transform: scaleX(-1);
+  background: rgba(0, 0, 0, 0.3);
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+#hand-canvas:hover {
+  opacity: 1;
+}
+
+#hand-canvas.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#ui-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 50;
+}
+
+#gesture-indicator {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  opacity: 0.5;
+}
+
+#gesture-text {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+#shape-indicator {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  opacity: 0.4;
+}
+
+#shape-text {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 3px;
+}
+
+#instructions {
+  display: none;
+}
+
+#loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: opacity 0.5s ease;
+}
+
+#loading.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#loading p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  margin-top: 20px;
+  letter-spacing: 1px;
+}
+
+#loading .sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 8px;
+}
+
+.loader {
+  width: 40px;
+  height: 40px;
+  border: 2px solid rgba(138, 43, 226, 0.2);
+  border-top-color: #8a2be2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

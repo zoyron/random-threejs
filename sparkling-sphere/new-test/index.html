@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Particle Cosmos</title>
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+  <canvas id="webgl"></canvas>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="hand-canvas"></canvas>
+
+  <div id="ui-overlay">
+    <div id="gesture-indicator">
+      <span id="gesture-text"></span>
+    </div>
+    <div id="shape-indicator">
+      <span id="shape-text">COSMOS</span>
+    </div>
+  </div>
+
+  <div id="instructions"></div>
+
+  <div id="loading">
+    <div class="loader"></div>
+    <p>Initializing...</p>
+    <p class="sub">Allow camera for hand tracking</p>
+  </div>
+
+  <script type="module" src="./src/script.js"></script>
+</body>
+</html>
