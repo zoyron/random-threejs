@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shapiro Delay — Gravity Makes Light Arrive Late</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #01080f;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    color: #e0f4ff;
+  }
+  canvas { display: block; }
+  #ui {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #title {
+    position: absolute;
+    top: 32px; left: 40px;
+  }
+  #title h1 {
+    font-size: 14px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #7ee8ff;
+    font-weight: normal;
+    line-height: 1.8;
+    text-shadow: 0 0 12px #40c8ff88;
+  }
+  #title h2 {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: #88bbcc;
+    font-weight: normal;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  #legend {
+    position: absolute;
+    bottom: 36px; left: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .leg-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #99ccdd;
+  }
+  .leg-line {
+    width: 28px; height: 2px;
+  }
+  #delay-panel {
+    position: absolute;
+    top: 32px; right: 40px;
+    text-align: right;
+  }
+  #delay-panel .label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #aaccdd;
+    margin-bottom: 4px;
+  }
+  #delay-val {
+    font-size: 36px;
+    letter-spacing: 0.05em;
+    color: #ffcc66;
+    font-weight: normal;
+    line-height: 1;
+    text-shadow: 0 0 20px #ff990088, 0 0 40px #ff660044;
+  }
+  #delay-unit {
+    font-size: 11px;
+    color: #cc9944;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  #pulse-info {
+    position: absolute;
+    bottom: 36px; right: 40px;
+    text-align: right;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: #88ddbb;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="title">
+    <h1>Shapiro Delay</h1>
+    <h2>Gravity Makes Light Arrive Late</h2>
+  </div>
+  <div id="legend">
+    <div class="leg-row">
+      <div class="leg-line" style="background: #60d0ff;"></div>
+      <span>Expected (flat-space)</span>
+    </div>
+    <div class="leg-row">
+      <div class="leg-line" style="background: #f0a050; height: 1px;"></div>
+      <span>Actual pulse path</span>
+    </div>
+    <div class="leg-row">
+      <div class="leg-line" style="background: #8844cc; border-radius: 2px;"></div>
+      <span>Spacetime distortion</span>
+    </div>
+  </div>
+  <div id="delay-panel">
+    <div class="label">Shapiro Delay</div>
+    <div id="delay-val">0.00</div>
+    <div id="delay-unit">μs excess</div>
+  </div>
+  <div id="pulse-info">
+    <div id="pulse-state">Awaiting pulse...</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─── Scene Setup ─────────────────────────────────────────────────────────────
+const W = window.innerWidth, H = window.innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x010c18);
+
+const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 300);
+camera.position.set(0, 22, 48);
+camera.lookAt(0, 0, 0);
+
+// ─── Spacetime Grid (distorted plane) ────────────────────────────────────────
+const GRID_W = 80, GRID_H = 80, SEGS = 64;
+const gridGeo = new THREE.PlaneGeometry(GRID_W, GRID_H, SEGS, SEGS);
+gridGeo.rotateX(-Math.PI / 2);
+
+// Displace vertices toward the black hole (center)
+const posArr = gridGeo.attributes.position;
+const BH_RADIUS = 3.5;
+for (let i = 0; i < posArr.count; i++) {
+  const x = posArr.getX(i);
+  const z = posArr.getZ(i);
+  const r = Math.sqrt(x * x + z * z);
+  const dip = -BH_RADIUS * BH_RADIUS / (r + BH_RADIUS * 0.6);
+  posArr.setY(i, dip);
+}
+gridGeo.computeVertexNormals();
+
+const gridMat = new THREE.MeshBasicMaterial({
+  color: 0x1a5577,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.7,
+});
+const gridMesh = new THREE.Mesh(gridGeo, gridMat);
+scene.add(gridMesh);
+
+// ─── Black Hole ───────────────────────────────────────────────────────────────
+// Event horizon ring
+const ringGeo = new THREE.TorusGeometry(BH_RADIUS, 0.18, 12, 80);
+const ringMat = new THREE.MeshBasicMaterial({ color: 0xcc66ff });
+const ring = new THREE.Mesh(ringGeo, ringMat);
+ring.rotation.x = Math.PI / 2;
+scene.add(ring);
+
+// Accretion disk glow rings
+for (let i = 0; i < 8; i++) {
+  const r = BH_RADIUS + i * 0.55 + 0.3;
+  const g = new THREE.TorusGeometry(r, 0.07 - i * 0.006, 8, 80);
+  const m = new THREE.MeshBasicMaterial({
+    color: new THREE.Color().setHSL(0.09 - i * 0.008, 1, 0.65 - i * 0.06),
+    transparent: true,
+    opacity: 0.9 - i * 0.09,
+  });
+  const mesh = new THREE.Mesh(g, m);
+  mesh.rotation.x = Math.PI / 2;
+  scene.add(mesh);
+}
+
+// Dark sphere at center
+const bhGeo = new THREE.SphereGeometry(BH_RADIUS * 0.9, 32, 32);
+const bhMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+scene.add(new THREE.Mesh(bhGeo, bhMat));
+
+// ─── Transmitter & Reflector ──────────────────────────────────────────────────
+const TX_POS = new THREE.Vector3(-22, 0, 0);
+const RX_POS = new THREE.Vector3(22, 0, 0);
+
+function makeStation(pos, col) {
+  const g = new THREE.SphereGeometry(0.8, 16, 16);
+  const m = new THREE.MeshBasicMaterial({ color: col });
+  const mesh = new THREE.Mesh(g, m);
+  mesh.position.copy(pos);
+  scene.add(mesh);
+
+  // Glow ring around station
+  const rg = new THREE.TorusGeometry(1.3, 0.08, 8, 32);
+  const rm = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.5 });
+  const rMesh = new THREE.Mesh(rg, rm);
+  rMesh.position.copy(pos);
+  rMesh.rotation.x = Math.PI / 2;
+  scene.add(rMesh);
+
+  // Pillar down to grid
+  const pg = new THREE.CylinderGeometry(0.06, 0.06, 3, 8);
+  const pm = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.7 });
+  const pillar = new THREE.Mesh(pg, pm);
+  pillar.position.set(pos.x, -1.5, pos.z);
+  scene.add(pillar);
+
+  return mesh;
+}
+
+makeStation(TX_POS, 0x60d0ff);
+makeStation(RX_POS, 0x60d0ff);
+
+// Label sprites (simple lines)
+function makeLine(p1, p2, color, opacity = 1) {
+  const g = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+  const m = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+  return new THREE.Line(g, m);
+}
+
+// ─── Pulse System ─────────────────────────────────────────────────────────────
+const NUM_POINTS = 200;
+
+// Compute actual path skimming near BH (bent by gravity)
+function computeActualPath(from, to, numPts) {
+  const pts = [];
+  for (let i = 0; i < numPts; i++) {
+    const t = i / (numPts - 1);
+    const x = THREE.MathUtils.lerp(from.x, to.x, t);
+    const z = THREE.MathUtils.lerp(from.z, to.z, t);
+    // deflection: push slightly toward BH center (bending), very small
+    const r = Math.sqrt(x * x + z * z);
+    const bendY = -BH_RADIUS * BH_RADIUS / (r * r + BH_RADIUS * BH_RADIUS) * 1.2;
+    // Shapiro delay: the path dips in y (spacetime depth) near BH
+    pts.push(new THREE.Vector3(x, bendY * 0.6, z));
+  }
+  return pts;
+}
+
+// Flat-space path (straight, y=0)
+function computeFlatPath(from, to, numPts) {
+  const pts = [];
+  for (let i = 0; i < numPts; i++) {
+    const t = i / (numPts - 1);
+    pts.push(new THREE.Vector3(
+      THREE.MathUtils.lerp(from.x, to.x, t),
+      0,
+      THREE.MathUtils.lerp(from.z, to.z, t)
+    ));
+  }
+  return pts;
+}
+
+const actualPathPts = computeActualPath(TX_POS, RX_POS, NUM_POINTS);
+const actualPathPtsReturn = computeActualPath(RX_POS, TX_POS, NUM_POINTS);
+const flatPathPts = computeFlatPath(TX_POS, RX_POS, NUM_POINTS);
+
+// Ghost flat-space line
+const flatLine = makeLine(flatPathPts[0], flatPathPts[flatPathPts.length - 1], 0x44ccff, 0.4);
+scene.add(flatLine);
+
+// ─── Pulse Particles ──────────────────────────────────────────────────────────
+class PulseTrail {
+  constructor(pathPts, color, isFlat, speed) {
+    this.path = pathPts;
+    this.t = 0;
+    this.speed = speed; // 0..1 fraction per second
+    this.done = false;
+    this.isFlat = isFlat;
+
+    // Trail geometry
+    const trailLen = isFlat ? 14 : 30;
+    this.trailLen = trailLen;
+    const positions = new Float32Array(trailLen * 3);
+    this.trailGeo = new THREE.BufferGeometry();
+    this.trailGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const colors = new Float32Array(trailLen * 3);
+    this.trailGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const mat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: isFlat ? 0.75 : 1,
+      linewidth: 2,
+    });
+    this.line = new THREE.Line(this.trailGeo, mat);
+    scene.add(this.line);
+
+    // Head sphere
+    const hg = new THREE.SphereGeometry(isFlat ? 0.22 : 0.38, 10, 10);
+    const hm = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: isFlat ? 0.8 : 1 });
+    this.head = new THREE.Mesh(hg, hm);
+    scene.add(this.head);
+
+    this.color = new THREE.Color(color);
+
+    // Filament particles near BH
+    if (!isFlat) {
+      this.particles = [];
+      for (let i = 0; i < 12; i++) {
+        const pg = new THREE.SphereGeometry(0.12, 6, 6);
+        const pm = new THREE.MeshBasicMaterial({ color: 0xffcc44, transparent: true, opacity: 0 });
+        const pm2 = new THREE.Mesh(pg, pm);
+        scene.add(pm2);
+        this.particles.push({ mesh: pm2, life: 0 });
+      }
+    }
+  }
+
+  update(dt) {
+    if (this.done) return;
+    this.t += dt * this.speed;
+    if (this.t >= 1) { this.t = 1; this.done = true; }
+
+    const idx = Math.floor(this.t * (this.path.length - 1));
+    const pos = this.path[Math.min(idx, this.path.length - 1)];
+    this.head.position.copy(pos);
+
+    // Trail
+    const posArr = this.trailGeo.attributes.position.array;
+    const colArr = this.trailGeo.attributes.color.array;
+    for (let i = 0; i < this.trailLen; i++) {
+      const ti = Math.max(0, idx - (this.trailLen - 1 - i));
+      const p = this.path[ti];
+      posArr[i * 3] = p.x;
+      posArr[i * 3 + 1] = p.y;
+      posArr[i * 3 + 2] = p.z;
+      const fade = i / this.trailLen;
+      colArr[i * 3] = this.color.r * fade;
+      colArr[i * 3 + 1] = this.color.g * fade;
+      colArr[i * 3 + 2] = this.color.b * fade;
+    }
+    this.trailGeo.attributes.position.needsUpdate = true;
+    this.trailGeo.attributes.color.needsUpdate = true;
+
+    // Filament effect near BH
+    if (this.particles) {
+      const r = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
+      const nearBH = Math.max(0, 1 - (r - BH_RADIUS) / 6);
+      for (const p of this.particles) {
+        if (nearBH > 0.3 && Math.random() < 0.3) {
+          if (p.life <= 0) {
+            p.mesh.position.set(
+              pos.x + (Math.random() - 0.5) * 1.5,
+              pos.y + (Math.random() - 0.5) * 0.8,
+              pos.z + (Math.random() - 0.5) * 1.5
+            );
+            p.life = 1;
+            p.mesh.material.opacity = nearBH * 0.8;
+          }
+        }
+        if (p.life > 0) {
+          p.life -= dt * 2;
+          p.mesh.material.opacity = Math.max(0, p.life * nearBH * 0.7);
+          p.mesh.position.y += dt * 0.3;
+        }
+      }
+    }
+  }
+
+  destroy() {
+    scene.remove(this.line);
+    scene.remove(this.head);
+    if (this.particles) this.particles.forEach(p => scene.remove(p.mesh));
+  }
+}
+
+// ─── State Machine ────────────────────────────────────────────────────────────
+let pulses = [];
+let state = 'idle';
+let stateTimer = 0;
+let cycleCount = 0;
+let delayDisplay = 0;
+
+const FLAT_SPEED = 0.38;
+const ACTUAL_SPEED = 0.22; // slower due to Shapiro delay
+const DELAY_USEC = 142; // simulated delay in μs
+
+const delayEl = document.getElementById('delay-val');
+const pulseStateEl = document.getElementById('pulse-state');
+
+function launchPulse() {
+  pulses.forEach(p => p.destroy());
+  pulses = [];
+
+  // flat-space ghost
+  pulses.push(new PulseTrail(flatPathPts, 0x44ddff, true, FLAT_SPEED));
+  // actual pulse
+  pulses.push(new PulseTrail(actualPathPts, 0xffaa22, false, ACTUAL_SPEED));
+
+  state = 'outgoing';
+  delayDisplay = 0;
+  pulseStateEl.textContent = 'Pulse en route…';
+}
+
+function launchReturn() {
+  pulses.forEach(p => p.destroy());
+  pulses = [];
+  pulses.push(new PulseTrail(computeFlatPath(RX_POS, TX_POS, NUM_POINTS), 0x44ddff, true, FLAT_SPEED));
+  pulses.push(new PulseTrail(actualPathPtsReturn, 0xffaa22, false, ACTUAL_SPEED));
+  state = 'return';
+  pulseStateEl.textContent = 'Echo returning…';
+}
+
+// ─── Stars ────────────────────────────────────────────────────────────────────
+const starGeo = new THREE.BufferGeometry();
+const starPos = [];
+for (let i = 0; i < 2500; i++) {
+  starPos.push((Math.random() - 0.5) * 280, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 280);
+}
+starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xaaccdd, size: 0.25 })));
+
+// ─── Cursor Gravity Ripple ────────────────────────────────────────────────────
+// A small glowing probe that follows mouse projected onto the grid plane
+const probeGeo = new THREE.SphereGeometry(0.3, 12, 12);
+const probeMat = new THREE.MeshBasicMaterial({ color: 0x88ffcc, transparent: true, opacity: 0 });
+const probe = new THREE.Mesh(probeGeo, probeMat);
+scene.add(probe);
+
+// Ripple rings emanating from cursor position on grid
+const RIPPLE_COUNT = 4;
+const ripples = [];
+for (let i = 0; i < RIPPLE_COUNT; i++) {
+  const rg = new THREE.TorusGeometry(1, 0.05, 6, 48);
+  const rm = new THREE.MeshBasicMaterial({ color: 0x44ffcc, transparent: true, opacity: 0 });
+  const r = new THREE.Mesh(rg, rm);
+  r.rotation.x = Math.PI / 2;
+  scene.add(r);
+  ripples.push({ mesh: r, phase: i / RIPPLE_COUNT });
+}
+
+// ─── Interactive Camera State ─────────────────────────────────────────────────
+let isDragging = false;
+let lastMouseX = 0, lastMouseY = 0;
+let orbitYaw = 0;       // horizontal angle
+let orbitPitch = 0.4;   // vertical angle (radians)
+let orbitRadius = 48;
+let autoOrbit = true;   // resumes after 3s idle
+let autoOrbitBase = 0;  // angle offset when auto-orbit resumes
+let idleTimer = 0;
+
+// Raw mouse coords (NDC -1..1)
+let mouseNDC = new THREE.Vector2(0, 0);
+// World-space cursor position on y=0 plane
+let cursorWorld = new THREE.Vector3(0, 0, 0);
+let cursorActive = false;
+
+// ─── Grid vertex distortion from cursor ──────────────────────────────────────
+// Store original positions for live cursor-dip effect
+const origY = new Float32Array(posArr.count);
+for (let i = 0; i < posArr.count; i++) origY[i] = posArr.getY(i);
+
+function updateGridDistortion() {
+  for (let i = 0; i < posArr.count; i++) {
+    const x = posArr.getX(i);
+    const z = posArr.getZ(i);
+    // BH dip (original)
+    let y = origY[i];
+    // Cursor dip: small gravity well under cursor
+    if (cursorActive) {
+      const dx = x - cursorWorld.x;
+      const dz = z - cursorWorld.z;
+      const cr = Math.sqrt(dx * dx + dz * dz);
+      const cursorDip = -2.5 / (cr + 1.2);
+      y += cursorDip;
+    }
+    posArr.setY(i, y);
+  }
+  posArr.needsUpdate = true;
+  gridGeo.computeVertexNormals();
+}
+
+// ─── Mouse / Touch Listeners ──────────────────────────────────────────────────
+renderer.domElement.addEventListener('mousedown', e => {
+  isDragging = true;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+  autoOrbit = false;
+  idleTimer = 0;
+});
+
+renderer.domElement.addEventListener('mousemove', e => {
+  // Update NDC
+  mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  cursorActive = true;
+
+  if (isDragging) {
+    const dx = e.clientX - lastMouseX;
+    const dy = e.clientY - lastMouseY;
+    orbitYaw -= dx * 0.008;
+    orbitPitch = Math.max(0.08, Math.min(1.3, orbitPitch - dy * 0.006));
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    idleTimer = 0;
+  }
+});
+
+renderer.domElement.addEventListener('mouseup', () => { isDragging = false; });
+renderer.domElement.addEventListener('mouseleave', () => { cursorActive = false; isDragging = false; });
+
+renderer.domElement.addEventListener('wheel', e => {
+  orbitRadius = Math.max(18, Math.min(90, orbitRadius + e.deltaY * 0.05));
+  autoOrbit = false;
+  idleTimer = 0;
+});
+
+// Click: immediately fire a new pulse
+renderer.domElement.addEventListener('click', e => {
+  if (Math.abs(e.clientX - lastMouseX) < 3 && Math.abs(e.clientY - lastMouseY) < 3) {
+    // Only trigger if not dragging
+    pulses.forEach(p => p.destroy());
+    pulses = [];
+    launchPulse();
+    stateTimer = 0;
+  }
+});
+
+// Touch support
+renderer.domElement.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    lastMouseX = e.touches[0].clientX;
+    lastMouseY = e.touches[0].clientY;
+    autoOrbit = false;
+  }
+}, { passive: true });
+renderer.domElement.addEventListener('touchmove', e => {
+  if (isDragging && e.touches.length === 1) {
+    const dx = e.touches[0].clientX - lastMouseX;
+    const dy = e.touches[0].clientY - lastMouseY;
+    orbitYaw -= dx * 0.008;
+    orbitPitch = Math.max(0.08, Math.min(1.3, orbitPitch - dy * 0.006));
+    lastMouseX = e.touches[0].clientX;
+    lastMouseY = e.touches[0].clientY;
+  }
+}, { passive: true });
+renderer.domElement.addEventListener('touchend', () => { isDragging = false; });
+
+// Add hint to UI
+const hintEl = document.createElement('div');
+hintEl.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#336655;text-align:center;pointer-events:none;transition:opacity 1s;';
+hintEl.innerHTML = 'Drag to orbit &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Click to fire pulse<br><span style="color:#224433;font-size:9px">Move cursor to warp the spacetime grid</span>';
+document.getElementById('ui').appendChild(hintEl);
+setTimeout(() => { hintEl.style.opacity = '0'; }, 4000);
+
+// ─── Render Loop ──────────────────────────────────────────────────────────────
+let last = performance.now();
+
+// Raycaster for projecting cursor onto y-plane
+const raycaster = new THREE.Raycaster();
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  stateTimer += dt;
+
+  // ── Camera ──
+  if (!isDragging) idleTimer += dt;
+  if (idleTimer > 3) autoOrbit = true;
+
+  if (autoOrbit) {
+    orbitYaw += dt * 0.05;
+  }
+  camera.position.x = Math.sin(orbitYaw) * orbitRadius * Math.cos(orbitPitch);
+  camera.position.z = Math.cos(orbitYaw) * orbitRadius * Math.cos(orbitPitch);
+  camera.position.y = orbitRadius * Math.sin(orbitPitch);
+  camera.lookAt(0, -2, 0);
+
+  // ── Cursor world position ──
+  if (cursorActive) {
+    raycaster.setFromCamera(mouseNDC, camera);
+    const hit = new THREE.Vector3();
+    raycaster.ray.intersectPlane(groundPlane, hit);
+    if (hit) {
+      cursorWorld.lerp(hit, 0.15); // smooth
+      const distBH = cursorWorld.length();
+      probe.position.set(cursorWorld.x, 0.3, cursorWorld.z);
+      probeMat.opacity = Math.min(0.9, 1.2 / distBH);
+      probe.scale.setScalar(1 + 0.3 * Math.sin(stateTimer * 8));
+    }
+  } else {
+    probeMat.opacity *= 0.9;
+  }
+
+  // ── Ripple rings from cursor ──
+  ripples.forEach((r, i) => {
+    r.phase = (r.phase + dt * 0.6) % 1;
+    const scale = 1 + r.phase * 7;
+    r.mesh.scale.set(scale, scale, scale);
+    r.mesh.position.set(cursorWorld.x, 0.15, cursorWorld.z);
+    const distBH = Math.sqrt(cursorWorld.x ** 2 + cursorWorld.z ** 2);
+    const nearBH = cursorActive ? Math.min(1, 6 / (distBH + 2)) : 0;
+    r.mesh.material.opacity = cursorActive ? (1 - r.phase) * 0.5 * nearBH : 0;
+  });
+
+  // ── Live grid cursor dip ──
+  if (cursorActive) updateGridDistortion();
+
+  // Pulse ring flicker
+  ring.material.color.setHSL(0.78 + Math.sin(stateTimer * 3) * 0.05, 1, 0.65 + Math.sin(stateTimer * 5) * 0.08);
+
+  // Update pulses
+  pulses.forEach(p => p.update(dt));
+
+  // State machine
+  if (state === 'idle' && stateTimer > 2.0) {
+    launchPulse();
+    stateTimer = 0;
+  }
+
+  if (state === 'outgoing') {
+    // Animate delay counter while actual pulse is near BH
+    const actualPulse = pulses[1];
+    if (actualPulse) {
+      const pos = actualPulse.head.position;
+      const r = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
+      const nearness = Math.max(0, 1 - (r - BH_RADIUS) / 8);
+      delayDisplay = Math.min(delayDisplay + nearness * dt * DELAY_USEC * 0.8, DELAY_USEC);
+    }
+    delayEl.textContent = delayDisplay.toFixed(1);
+
+    if (pulses.every(p => p.done)) {
+      state = 'pause1';
+      stateTimer = 0;
+      pulseStateEl.textContent = 'Reflector received — delay accumulated';
+    }
+  }
+
+  if (state === 'pause1' && stateTimer > 1.5) {
+    launchReturn();
+    stateTimer = 0;
+  }
+
+  if (state === 'return') {
+    if (pulses.every(p => p.done)) {
+      state = 'pause2';
+      stateTimer = 0;
+      cycleCount++;
+      pulseStateEl.textContent = `Echo arrived ${delayDisplay.toFixed(0)}μs late · Cycle ${cycleCount}`;
+    }
+  }
+
+  if (state === 'pause2' && stateTimer > 3.0) {
+    state = 'idle';
+    stateTimer = 0;
+    pulses.forEach(p => p.destroy());
+    pulses = [];
+    pulseStateEl.textContent = 'Awaiting next pulse…';
+  }
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+});
+</script>
+</body>
+</html>
