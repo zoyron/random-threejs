@@ -7,11 +7,12 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden}
-body{background:#e5e5e5;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;user-select:none;-webkit-user-select:none}
+body{background:radial-gradient(ellipse at 50% 35%,#cfa4ac 0%,#b88b96 55%,#9d7480 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;user-select:none;-webkit-user-select:none}
 #wrap{position:relative;display:inline-block}
 canvas{display:block;touch-action:none}
 #ovl{position:absolute;top:0;left:0;pointer-events:none}
-#hint{margin-top:14px;color:#aaa;font-size:13px;letter-spacing:.4px}
+#hint{margin-top:14px;color:#f5dfe4;font-size:13px;letter-spacing:.4px}
+#hint b{color:#ffffff;font-weight:600}
 </style>
 </head>
 <body>
@@ -19,109 +20,201 @@ canvas{display:block;touch-action:none}
   <canvas id="c"></canvas>
   <canvas id="ovl"></canvas>
 </div>
-<div id="hint">Grab and drag the receipt</div>
+<div id="hint">Drag to crumple · <b>double-click</b> to reset</div>
 <script>
 (function(){
 'use strict';
 
 var canvas=document.getElementById('c');
 var ovl=document.getElementById('ovl');
-var W=Math.min(window.innerWidth-20,680);
-var H=Math.min(window.innerHeight-80,680);
-canvas.width=W;canvas.height=H;
-ovl.width=W;ovl.height=H;
 var oc=ovl.getContext('2d');
-var gl=canvas.getContext('webgl',{antialias:true,alpha:false});
+var gl=canvas.getContext('webgl',{antialias:true,alpha:true,premultipliedAlpha:false});
 if(!gl){alert('WebGL not supported');return;}
-gl.clearColor(0.898,0.898,0.898,1);
 gl.enable(gl.DEPTH_TEST);
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
 
-var VS='attribute vec3 aPos;attribute vec2 aUV;attribute vec3 aNorm;uniform mat4 uMVP;varying vec2 vUV;varying vec3 vN;void main(){vUV=aUV;vN=aNorm;gl_Position=uMVP*vec4(aPos,1.0);}';
-var FS='precision mediump float;varying vec2 vUV;varying vec3 vN;uniform sampler2D uTex;uniform float uSide;void main(){vec3 n=normalize(vN)*uSide;vec3 L1=normalize(vec3(1.0,2.0,3.0));vec3 L2=normalize(vec3(-2.0,-0.5,1.5));float d1=max(dot(n,L1),0.0);float d2=max(dot(n,L2),0.0);float lit=0.40+d1*0.44+d2*0.16;vec2 uv=uSide<0.0?vec2(1.0-vUV.x,vUV.y):vUV;vec4 tx=texture2D(uTex,uv);gl_FragColor=vec4(tx.rgb*lit,1.0);}';
+var W,H;
+function resize(){
+  W=Math.min(window.innerWidth-20,1500);
+  H=Math.min(window.innerHeight-80,820);
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  ovl.style.width=W+'px';ovl.style.height=H+'px';
+  ovl.width=W*dpr;ovl.height=H*dpr;
+  oc.setTransform(dpr,0,0,dpr,0,0);
+  projMat=m4persp(Math.PI/4,W/H,0.1,100);
+  if(viewMat){mvpMat=m4mul(projMat,viewMat);invProj=m4inv(projMat);}
+}
+
+/* ─── SHADERS ─── */
+var VS='attribute vec3 aPos;attribute vec2 aUV;attribute vec3 aNorm;uniform mat4 uMVP;uniform mat4 uView;varying vec2 vUV;varying vec3 vN;varying vec3 vVP;void main(){vUV=aUV;vN=aNorm;vec4 vp=uView*vec4(aPos,1.0);vVP=vp.xyz;gl_Position=uMVP*vec4(aPos,1.0);}';
+var FS=[
+'precision mediump float;',
+'varying vec2 vUV;varying vec3 vN;varying vec3 vVP;',
+'uniform sampler2D uTex;uniform float uSide;',
+'void main(){',
+'  vec3 n=normalize(vN)*uSide;',
+'  vec3 L1=normalize(vec3(0.6,1.2,1.4));',
+'  vec3 L2=normalize(vec3(-1.5,-0.4,0.9));',
+'  vec3 V=normalize(-vVP);',
+'  float d1=max(dot(n,L1),0.0);',
+'  float d2=max(dot(n,L2),0.0);',
+'  float fres=pow(1.0-max(dot(n,V),0.0),3.0);',
+'  float lit=0.72+d1*0.28+d2*0.10+fres*0.06;',
+'  vec2 uv=uSide<0.0?vec2(1.0-vUV.x,vUV.y):vUV;',
+'  vec4 tx=texture2D(uTex,uv);',
+'  vec3 col=tx.rgb*lit;',
+'  col+=fres*vec3(0.10,0.05,0.06);',
+'  gl_FragColor=vec4(col,1.0);',
+'}'
+].join('\n');
+
+var SHADOW_VS='attribute vec3 aPos;uniform mat4 uMVP;void main(){gl_Position=uMVP*vec4(aPos,1.0);}';
+var SHADOW_FS='precision mediump float;void main(){gl_FragColor=vec4(0.0,0.0,0.0,0.22);}';
 
 function mkS(t,s){var sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(sh));return sh;}
-var prog=gl.createProgram();
-gl.attachShader(prog,mkS(gl.VERTEX_SHADER,VS));
-gl.attachShader(prog,mkS(gl.FRAGMENT_SHADER,FS));
-gl.linkProgram(prog);gl.useProgram(prog);
+function mkProg(vs,fs){var p=gl.createProgram();gl.attachShader(p,mkS(gl.VERTEX_SHADER,vs));gl.attachShader(p,mkS(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);return p;}
+var prog=mkProg(VS,FS);
+gl.useProgram(prog);
 var aP=gl.getAttribLocation(prog,'aPos'),aU=gl.getAttribLocation(prog,'aUV'),aN=gl.getAttribLocation(prog,'aNorm');
-var uM=gl.getUniformLocation(prog,'uMVP'),uT=gl.getUniformLocation(prog,'uTex'),uS=gl.getUniformLocation(prog,'uSide');
+var uM=gl.getUniformLocation(prog,'uMVP'),uV=gl.getUniformLocation(prog,'uView'),uT=gl.getUniformLocation(prog,'uTex'),uS=gl.getUniformLocation(prog,'uSide');
+var shProg=mkProg(SHADOW_VS,SHADOW_FS);
+var shaP=gl.getAttribLocation(shProg,'aPos'),shuM=gl.getUniformLocation(shProg,'uMVP');
 
 /* ─── TEXTURE ─── */
 function buildTex(){
-  var tw=512,th=1024,c=document.createElement('canvas');c.width=tw;c.height=th;
+  var tw=1280,th=640,c=document.createElement('canvas');c.width=tw;c.height=th;
   var x=c.getContext('2d');
-  x.fillStyle='#f8f5ec';x.fillRect(0,0,tw,th);
-  for(var i=0;i<5000;i++){x.fillStyle='rgba(0,0,0,'+(Math.random()*0.03)+')';x.fillRect(Math.random()*tw,Math.random()*th,1,1);}
-  var F="'Courier New',Courier,monospace",P=28,y=36;
-  function cen(t,s,b){x.font=(b?'bold ':'')+s+'px '+F;x.fillStyle='#1a1a1a';x.textAlign='center';x.fillText(t,tw/2,y);y+=s*1.55;}
-  function lft(t,s){x.font=s+'px '+F;x.fillStyle='#1a1a1a';x.textAlign='left';x.fillText(t,P,y);y+=s*1.55;}
-  function lr(l,r,s,b){x.font=(b?'bold ':'')+s+'px '+F;x.fillStyle='#1a1a1a';x.textAlign='left';x.fillText(l,P,y);x.textAlign='right';x.fillText(r,tw-P,y);y+=s*1.55;}
-  function dash(thk){y+=4;x.save();x.strokeStyle='#555';x.lineWidth=thk?2.5:1;x.setLineDash(thk?[]:[5,4]);x.beginPath();x.moveTo(P,y);x.lineTo(tw-P,y);x.stroke();x.restore();y+=12;}
-  cen('THE FLORNRM SHOP',22,true);cen('42 Mesh Lane, WebGL City',13);cen('Tel: (555) 042-1337',13);
-  y+=8;lft('Date: 2026-02-23  14:17',13);lft('Order: #00382',13);y+=4;dash(0);
-  lr('Vertex Shader','$4.20',13);lr('Fragment Shader','$3.50',13);lr('Normal Map','$2.80',13);
-  lr('UV Unwrap','$1.50',13);lr('Cloth Simulation','$6.00',13);y+=4;dash(0);
-  lr('Subtotal','$18.00',13);lr('Tax (8%)',' $1.44',13);y+=4;dash(1);
-  lr('TOTAL','$19.44',17,1);y+=20;cen('Thank you for visiting!',14);y+=2;cen('http://github.com/flornkm',11);
+  var g=x.createLinearGradient(0,0,tw,th);
+  g.addColorStop(0,'#FFF0EF');g.addColorStop(0.6,'#FDE3E2');g.addColorStop(1,'#F9D5D3');
+  x.fillStyle=g;x.fillRect(0,0,tw,th);
+  for(var i=0;i<7500;i++){x.fillStyle='rgba(100,40,55,'+(Math.random()*0.04)+')';x.fillRect(Math.random()*tw,Math.random()*th,1,1);}
+  var F='-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+  var PAD=96;
+  // eyebrow — coral accent, the one earned saturation
+  x.fillStyle='#FF4E50';x.font='500 30px '+F;x.textAlign='left';x.textBaseline='alphabetic';
+  x.fillText('Creative Engineer & Generative Artist',PAD,110);
+  // big name — deep wine-rose ink
+  x.fillStyle='#3e1a24';x.font='800 150px '+F;
+  x.fillText('Sarlloc',PAD,275);
+  // body — wrap
+  var body=[
+    {t:'Builds the web the way some people build model ships — patient, precise, slightly obsessed. An ',b:0},
+    {t:'engineer',b:1},{t:' by trade, a ',b:0},{t:'creative coder',b:1},
+    {t:' by habit; as at home inside a ',b:0},{t:'gnarly edge case',b:1},
+    {t:' as inside a blank page that wants to ',b:0},{t:'move',b:1},
+    {t:'. Lives for the moment an idea finally ',b:0},{t:'behaves on screen',b:1},{t:'.',b:0}
+  ];
+  var maxW=tw-PAD*2-40,ly=350,lh=42,curX=PAD;
+  function setFont(b){x.font=(b?'700 ':'400 ')+'28px '+F;x.fillStyle=b?'#3e1a24':'#7a4552';}
+  for(var i=0;i<body.length;i++){
+    var seg=body[i];setFont(seg.b);
+    var words=seg.t.split(/(\s+)/);
+    for(var j=0;j<words.length;j++){
+      var w=words[j];if(!w)continue;
+      var ww=x.measureText(w).width;
+      if(curX+ww>PAD+maxW&&/\S/.test(w)){ly+=lh;curX=PAD;}
+      x.fillText(w,curX,ly);curX+=ww;
+    }
+  }
+  // signature line
+  x.fillStyle='#c89aa1';x.font='500 20px '+F;x.textAlign='left';
+  x.fillText('— sagar, somewhere online',PAD,ly+72);
   return c;
 }
 var tex=gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D,tex);
+gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
 gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,buildTex());
-gl.generateMipmap(gl.TEXTURE_2D);
-gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 gl.uniform1i(uT,0);
 
 /* ═══════ CLOTH PHYSICS ═══════ */
-var COLS=26,ROWS=52,CW=3.0,CH=6.0,NV=ROWS*COLS;
+var COLS=64,ROWS=32,CW=10.0,CH=5.0,NV=ROWS*COLS;
 var px=new Float32Array(NV),py=new Float32Array(NV),pz=new Float32Array(NV);
 var ox=new Float32Array(NV),oy=new Float32Array(NV),oz=new Float32Array(NV);
-var pinned=new Uint8Array(NV),grabbed=new Uint8Array(NV);
+var pinned=new Uint8Array(NV);
+var grabW=new Float32Array(NV);   // grab weight 0..1
+var grabOffX=new Float32Array(NV),grabOffY=new Float32Array(NV),grabOffZ=new Float32Array(NV);
 
-for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){
-  var i=r*COLS+c;
-  px[i]=ox[i]=(c/(COLS-1)-0.5)*CW;
-  py[i]=oy[i]=(r/(ROWS-1))*(-CH)+CH*0.5;
-  pz[i]=oz[i]=(Math.random()-0.5)*0.003;
-  pinned[i]=r===0?1:0;
+function resetCloth(){
+  for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){
+    var i=r*COLS+c;
+    px[i]=ox[i]=(c/(COLS-1)-0.5)*CW;
+    py[i]=oy[i]=(r/(ROWS-1))*(-CH)+CH*0.5;
+    pz[i]=oz[i]=(Math.random()-0.5)*0.003;
+    pinned[i]=r===0?1:0;
+    grabW[i]=0;
+  }
+  grabActive=false;
 }
 
-var cA=[],cB=[],cR=[];
-function addC(a,b){cA.push(a);cB.push(b);cR.push(Math.sqrt((px[b]-px[a])**2+(py[b]-py[a])**2+(pz[b]-pz[a])**2));}
+var cA=[],cB=[],cR=[],cK=[];
+function addC(a,b,k){cA.push(a);cB.push(b);cR.push(Math.sqrt((px[b]-px[a])**2+(py[b]-py[a])**2+(pz[b]-pz[a])**2));cK.push(k);}
+resetCloth();
 for(var r2=0;r2<ROWS;r2++)for(var c2=0;c2<COLS;c2++){
   var i2=r2*COLS+c2;
-  if(c2<COLS-1)addC(i2,i2+1);
-  if(r2<ROWS-1)addC(i2,i2+COLS);
-  if(r2<ROWS-1&&c2<COLS-1)addC(i2,i2+COLS+1);
-  if(r2<ROWS-1&&c2>0)addC(i2,i2+COLS-1);
-  if(c2<COLS-2)addC(i2,i2+2);
-  if(r2<ROWS-2)addC(i2,i2+COLS*2);
+  if(c2<COLS-1)addC(i2,i2+1,1.0);
+  if(r2<ROWS-1)addC(i2,i2+COLS,1.0);
+  if(r2<ROWS-1&&c2<COLS-1)addC(i2,i2+COLS+1,1.0);
+  if(r2<ROWS-1&&c2>0)addC(i2,i2+COLS-1,1.0);
+  // bending (2-away) — lower stiffness so paper bends but resists crumpling
+  if(c2<COLS-2)addC(i2,i2+2,0.35);
+  if(r2<ROWS-2)addC(i2,i2+COLS*2,0.35);
 }
-var NC=cA.length,caA=new Int32Array(cA),caB=new Int32Array(cB),caR=new Float32Array(cR);
-var GRAVITY=5.0,DAMPING=0.990,ITERS=16,DT=1/60;
-var grabIdx=-1,grabWX=0,grabWY=0,grabWZ=0;
+var NC=cA.length,caA=new Int32Array(cA),caB=new Int32Array(cB),caR=new Float32Array(cR),caK=new Float32Array(cK);
+var GRAVITY=5.2,DAMPING=0.992,ITERS=14,DT=1/60,GROUND_Y=-3.6;
+var grabActive=false,grabAnchorX=0,grabAnchorY=0,grabAnchorZ=0;
+var windT=0;
 
 function stepCloth(dt){
   var dt2=dt*dt;
+  windT+=dt;
+  // idle ambient drift — only when not grabbed, gentle
+  var windAmp=grabActive?0.0:0.35;
+  var wx=Math.sin(windT*0.7)*0.6+Math.sin(windT*1.9+1.3)*0.3;
+  var wz=Math.cos(windT*0.9+0.5)*0.8+Math.sin(windT*2.3)*0.25;
   for(var i=0;i<NV;i++){
-    if(pinned[i]||grabbed[i])continue;
+    if(pinned[i])continue;
     var vx=(px[i]-ox[i])*DAMPING,vy=(py[i]-oy[i])*DAMPING,vz=(pz[i]-oz[i])*DAMPING;
     ox[i]=px[i];oy[i]=py[i];oz[i]=pz[i];
-    px[i]+=vx;py[i]+=vy-GRAVITY*dt2;pz[i]+=vz;
+    var ay=-GRAVITY;
+    var ax=wx*windAmp, az=wz*windAmp;
+    px[i]+=vx+ax*dt2;py[i]+=vy+ay*dt2;pz[i]+=vz+az*dt2;
   }
-  if(grabIdx>=0){px[grabIdx]=grabWX;py[grabIdx]=grabWY;pz[grabIdx]=grabWZ;}
-  for(var it=0;it<ITERS;it++)for(var k=0;k<NC;k++){
-    var a=caA[k],b=caB[k],dx=px[b]-px[a],dy=py[b]-py[a],dz=pz[b]-pz[a];
-    var dist=Math.sqrt(dx*dx+dy*dy+dz*dz)||1e-9;
-    var diff=(dist-caR[k])/dist*0.5;
-    var fA=!pinned[a]&&!grabbed[a],fB=!pinned[b]&&!grabbed[b];
-    if(fA&&fB){px[a]+=dx*diff;py[a]+=dy*diff;pz[a]+=dz*diff;px[b]-=dx*diff;py[b]-=dy*diff;pz[b]-=dz*diff;}
-    else if(fA){px[a]+=dx*diff*2;py[a]+=dy*diff*2;pz[a]+=dz*diff*2;}
-    else if(fB){px[b]-=dx*diff*2;py[b]-=dy*diff*2;pz[b]-=dz*diff*2;}
+  // grab: soft targeting with falloff weights
+  if(grabActive){
+    for(var i=0;i<NV;i++){
+      if(!grabW[i]||pinned[i])continue;
+      var tx=grabAnchorX+grabOffX[i],ty=grabAnchorY+grabOffY[i],tz=grabAnchorZ+grabOffZ[i];
+      var w=grabW[i];
+      px[i]=px[i]+(tx-px[i])*w;
+      py[i]=py[i]+(ty-py[i])*w;
+      pz[i]=pz[i]+(tz-pz[i])*w;
+    }
+  }
+  // constraints
+  for(var it=0;it<ITERS;it++){
+    for(var k=0;k<NC;k++){
+      var a=caA[k],b=caB[k],dx=px[b]-px[a],dy=py[b]-py[a],dz=pz[b]-pz[a];
+      var dist=Math.sqrt(dx*dx+dy*dy+dz*dz)||1e-9;
+      var diff=(dist-caR[k])/dist*0.5*caK[k];
+      var wa=pinned[a]?0:(1-grabW[a]*0.9),wb=pinned[b]?0:(1-grabW[b]*0.9);
+      var ws=wa+wb;if(ws<1e-6)continue;
+      var fa=wa/ws,fb=wb/ws;
+      px[a]+=dx*diff*fa*2;py[a]+=dy*diff*fa*2;pz[a]+=dz*diff*fa*2;
+      px[b]-=dx*diff*fb*2;py[b]-=dy*diff*fb*2;pz[b]-=dz*diff*fb*2;
+    }
+    // ground plane collision
+    for(var i=0;i<NV;i++){
+      if(pinned[i])continue;
+      if(py[i]<GROUND_Y){py[i]=GROUND_Y;ox[i]+=(px[i]-ox[i])*0.15;oz[i]+=(pz[i]-oz[i])*0.15;}
+    }
   }
 }
 
@@ -136,10 +229,12 @@ for(var r4=0;r4<ROWS-1;r4++)for(var c4=0;c4<COLS-1;c4++){
 var bIdx=new Uint16Array(numQ*6);
 for(var j=0;j<numQ*6;j+=3){bIdx[j]=fIdx[j+2];bIdx[j+1]=fIdx[j+1];bIdx[j+2]=fIdx[j];}
 var bufP=gl.createBuffer(),bufU=gl.createBuffer(),bufN=gl.createBuffer(),bufFI=gl.createBuffer(),bufBI=gl.createBuffer();
+var bufShP=gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER,bufU);gl.bufferData(gl.ARRAY_BUFFER,uvArr,gl.STATIC_DRAW);
 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,bufFI);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,fIdx,gl.STATIC_DRAW);
 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,bufBI);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,bIdx,gl.STATIC_DRAW);
 
+var shadowArr=new Float32Array(NV*3);
 function updateMesh(){
   for(var i=0;i<NV;i++){posArr[i*3]=px[i];posArr[i*3+1]=py[i];posArr[i*3+2]=pz[i];}
   normArr.fill(0);
@@ -157,6 +252,10 @@ function updateMesh(){
   for(var i2=0;i2<NV;i2++){
     var l=Math.sqrt(normArr[i2*3]**2+normArr[i2*3+1]**2+normArr[i2*3+2]**2)||1;
     normArr[i2*3]/=l;normArr[i2*3+1]/=l;normArr[i2*3+2]/=l;
+  }
+  // shadow projection — flatten to ground plane, offset slightly
+  for(var i=0;i<NV;i++){
+    shadowArr[i*3]=px[i];shadowArr[i*3+1]=GROUND_Y+0.01;shadowArr[i*3+2]=pz[i]+0.3;
   }
 }
 
@@ -199,18 +298,19 @@ function m4inv(m){
 function v3n(v){var l=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2])||1;return[v[0]/l,v[1]/l,v[2]/l];}
 function t4(m,v){return[m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3],m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3],m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3],m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]];}
 
-/* ─── CAMERA (fixed) ─── */
-var EYE=[0,1.5,10],CENTER=[0,-1,0],UP=[0,1,0];
+/* ─── CAMERA ─── */
+var EYE=[0,0.2,7.8],CENTER=[0,-0.4,0],UP=[0,1,0];
 var viewMat=m4lookAt(EYE,CENTER,UP);
-var projMat=m4persp(Math.PI/4,W/H,0.1,100);
-var mvpMat=m4mul(projMat,viewMat);
-var invProj=m4inv(projMat),invView=m4inv(viewMat);
+var projMat=null,mvpMat=null,invProj=null,invView=m4inv(viewMat);
+resize();
+window.addEventListener('resize',resize);
 
 /* ─── INTERACTION ─── */
-var isDown=false,grabSX=0,grabSY=0,grabOffX=0,grabOffY=0;
+var isDown=false,grabSX=0,grabSY=0,grabRadiusPx=72;
+var pointerWorldX=0,pointerWorldY=0;
 
 function findNearest(sx,sy){
-  var best=-1,bestD=40*40;
+  var best=-1,bestD=grabRadiusPx*grabRadiusPx;
   for(var i=0;i<NV;i++){
     var cl=t4(mvpMat,[px[i],py[i],pz[i],1]),w=cl[3];
     if(w<=0)continue;
@@ -221,47 +321,89 @@ function findNearest(sx,sy){
   return best;
 }
 
-function cursorOnPlane(sx,sy){
+function cursorOnPlane(sx,sy,zRef){
   var nx=(sx/W)*2-1,ny=1-(sy/H)*2;
   var e4=t4(invProj,[nx,ny,-1,1]);
   var ed=v3n([e4[0]/e4[3],e4[1]/e4[3],-1]);
   var wd=v3n([invView[0]*ed[0]+invView[4]*ed[1]+invView[8]*ed[2],
     invView[1]*ed[0]+invView[5]*ed[1]+invView[9]*ed[2],
     invView[2]*ed[0]+invView[6]*ed[1]+invView[10]*ed[2]]);
-  var t=-EYE[2]/wd[2];
-  return[EYE[0]+wd[0]*t,EYE[1]+wd[1]*t,0];
+  var t=(zRef-EYE[2])/wd[2];
+  return[EYE[0]+wd[0]*t,EYE[1]+wd[1]*t,zRef];
+}
+
+function beginGrab(sx,sy){
+  var seed=findNearest(sx,sy);
+  if(seed<0||pinned[seed])return false;
+  var cp=cursorOnPlane(sx,sy,pz[seed]);
+  grabAnchorX=px[seed];grabAnchorY=py[seed];grabAnchorZ=pz[seed];
+  // compute per-vertex weight + offset by screen-space distance from seed
+  var radius2=grabRadiusPx*grabRadiusPx;
+  var any=false;
+  for(var i=0;i<NV;i++){
+    grabW[i]=0;
+    if(pinned[i])continue;
+    var cl=t4(mvpMat,[px[i],py[i],pz[i],1]),w=cl[3];
+    if(w<=0)continue;
+    var sx2=(cl[0]/w*0.5+0.5)*W,sy2=(1-cl[1]/w*0.5-0.5)*H;
+    var d=(sx2-sx)*(sx2-sx)+(sy2-sy)*(sy2-sy);
+    if(d<radius2){
+      var t=1-Math.sqrt(d)/grabRadiusPx;
+      grabW[i]=t*t*(i===seed?1:0.85);
+      grabOffX[i]=px[i]-grabAnchorX;
+      grabOffY[i]=py[i]-grabAnchorY;
+      grabOffZ[i]=pz[i]-grabAnchorZ;
+      any=true;
+    }
+  }
+  grabActive=any;
+  // track cursor offset in world so drag preserves grip point
+  grabCursorOffX=grabAnchorX-cp[0];
+  grabCursorOffY=grabAnchorY-cp[1];
+  return any;
+}
+var grabCursorOffX=0,grabCursorOffY=0;
+
+function moveGrab(sx,sy){
+  if(!grabActive)return;
+  var cp=cursorOnPlane(sx,sy,grabAnchorZ);
+  grabAnchorX=cp[0]+grabCursorOffX;
+  grabAnchorY=cp[1]+grabCursorOffY;
+  // allow slight z-pull toward camera when dragging fast
+  grabAnchorZ=grabAnchorZ*0.92+0.0*0.08;
+}
+
+function endGrab(){
+  grabActive=false;
+  for(var i=0;i<NV;i++)grabW[i]=0;
 }
 
 canvas.addEventListener('pointerdown',function(e){
   e.preventDefault();canvas.setPointerCapture(e.pointerId);
   var r=canvas.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
   isDown=true;grabSX=sx;grabSY=sy;
-  var idx=findNearest(sx,sy);
-  if(idx>=0&&!pinned[idx]){
-    grabIdx=idx;grabbed[idx]=1;
-    var cp=cursorOnPlane(sx,sy);
-    grabOffX=px[idx]-cp[0];grabOffY=py[idx]-cp[1];
-    grabWX=px[idx];grabWY=py[idx];grabWZ=pz[idx];
-  }
+  beginGrab(sx,sy);
 });
-
 canvas.addEventListener('pointermove',function(e){
-  if(!isDown||grabIdx<0)return;
   var r=canvas.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
   grabSX=sx;grabSY=sy;
-  var cp=cursorOnPlane(sx,sy);
-  grabWX=cp[0]+grabOffX;grabWY=cp[1]+grabOffY;grabWZ=0;
+  if(isDown&&grabActive)moveGrab(sx,sy);
 });
-
-canvas.addEventListener('pointerup',function(){
-  isDown=false;
-  if(grabIdx>=0){grabbed[grabIdx]=0;grabIdx=-1;}
-});
+canvas.addEventListener('pointerup',function(){isDown=false;endGrab();});
+canvas.addEventListener('pointercancel',function(){isDown=false;endGrab();});
+canvas.addEventListener('dblclick',function(){endGrab();resetCloth();});
 
 /* ─── RENDER ─── */
 function render(){
-  gl.viewport(0,0,W,H);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-  gl.useProgram(prog);gl.uniformMatrix4fv(uM,false,mvpMat);
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  gl.viewport(0,0,W*dpr,H*dpr);
+  gl.clearColor(0,0,0,0);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+  // paper
+  gl.useProgram(prog);
+  gl.uniformMatrix4fv(uM,false,mvpMat);
+  gl.uniformMatrix4fv(uV,false,viewMat);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);
   gl.bindBuffer(gl.ARRAY_BUFFER,bufP);gl.bufferData(gl.ARRAY_BUFFER,posArr,gl.DYNAMIC_DRAW);
   gl.enableVertexAttribArray(aP);gl.vertexAttribPointer(aP,3,gl.FLOAT,false,0,0);
@@ -277,11 +419,15 @@ function render(){
 
 function drawOvl(){
   oc.clearRect(0,0,W,H);
-  if(grabIdx<0||!isDown)return;
-  oc.beginPath();oc.arc(grabSX,grabSY,18,0,Math.PI*2);
-  oc.fillStyle='rgba(59,130,246,0.15)';oc.fill();
-  oc.strokeStyle='rgba(59,130,246,0.5)';oc.lineWidth=2;oc.setLineDash([5,4]);oc.stroke();oc.setLineDash([]);
-  oc.beginPath();oc.arc(grabSX,grabSY,3.5,0,Math.PI*2);oc.fillStyle='rgba(59,130,246,0.7)';oc.fill();
+  if(!isDown||!grabActive)return;
+  // outer radius
+  oc.beginPath();oc.arc(grabSX,grabSY,grabRadiusPx,0,Math.PI*2);
+  oc.strokeStyle='rgba(59,130,246,0.28)';oc.lineWidth=1.5;oc.setLineDash([5,4]);oc.stroke();oc.setLineDash([]);
+  // inner dot
+  oc.beginPath();oc.arc(grabSX,grabSY,16,0,Math.PI*2);
+  oc.fillStyle='rgba(59,130,246,0.14)';oc.fill();
+  oc.strokeStyle='rgba(59,130,246,0.55)';oc.lineWidth=1.5;oc.stroke();
+  oc.beginPath();oc.arc(grabSX,grabSY,3.5,0,Math.PI*2);oc.fillStyle='rgba(59,130,246,0.8)';oc.fill();
 }
 
 /* ─── LOOP ─── */
