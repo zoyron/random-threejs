@@ -8,19 +8,21 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden}
 body{background:radial-gradient(ellipse at 50% 35%,#cfa4ac 0%,#b88b96 55%,#9d7480 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;user-select:none;-webkit-user-select:none}
-#wrap{position:relative;display:inline-block}
+#wrap{position:relative;display:inline-block;z-index:1}
 canvas{display:block;touch-action:none}
 #ovl{position:absolute;top:0;left:0;pointer-events:none}
+#bgv{position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:0}
 #hint{margin-top:14px;color:#f5dfe4;font-size:13px;letter-spacing:.4px}
 #hint b{color:#ffffff;font-weight:600}
 </style>
 </head>
 <body>
+<canvas id="bgv"></canvas>
 <div id="wrap">
   <canvas id="c"></canvas>
   <canvas id="ovl"></canvas>
 </div>
-<div id="hint">Drag to crumple · <b>double-click</b> to reset</div>
+<div id="hint">Drag on the text to crumple · <b>double-click</b> to reset</div>
 <script>
 (function(){
 'use strict';
@@ -31,8 +33,7 @@ var oc=ovl.getContext('2d');
 var gl=canvas.getContext('webgl',{antialias:true,alpha:true,premultipliedAlpha:false});
 if(!gl){alert('WebGL not supported');return;}
 gl.enable(gl.DEPTH_TEST);
-gl.enable(gl.BLEND);
-gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+gl.disable(gl.BLEND);
 
 var W,H;
 function resize(){
@@ -175,8 +176,9 @@ var windT=0;
 function stepCloth(dt){
   var dt2=dt*dt;
   windT+=dt;
-  // idle ambient drift — only when not grabbed, gentle
-  var windAmp=grabActive?0.0:0.35;
+  // idle ambient drift — only when not grabbed, gentle. On page load, boost for a few seconds so the cloth visibly sways (welcome motion).
+  var welcomeBoost=grabActive?0:Math.max(0,1-windT/2.5)*0.7;
+  var windAmp=grabActive?0.0:(0.35+welcomeBoost);
   var wx=Math.sin(windT*0.7)*0.6+Math.sin(windT*1.9+1.3)*0.3;
   var wz=Math.cos(windT*0.9+0.5)*0.8+Math.sin(windT*2.3)*0.25;
   for(var i=0;i<NV;i++){
@@ -299,7 +301,7 @@ function v3n(v){var l=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2])||1;return[v[0]/l,
 function t4(m,v){return[m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3],m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3],m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3],m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]];}
 
 /* ─── CAMERA ─── */
-var EYE=[0,0.2,7.8],CENTER=[0,-0.4,0],UP=[0,1,0];
+var EYE=[0,0.4,7.8],CENTER=[0,0,0],UP=[0,1,0];
 var viewMat=m4lookAt(EYE,CENTER,UP);
 var projMat=null,mvpMat=null,invProj=null,invView=m4inv(viewMat);
 resize();
@@ -430,11 +432,103 @@ function drawOvl(){
   oc.beginPath();oc.arc(grabSX,grabSY,3.5,0,Math.PI*2);oc.fillStyle='rgba(59,130,246,0.8)';oc.fill();
 }
 
+/* ─── BACKGROUND VINES (slow-growth, antfu-style) ─── */
+var bgv=document.getElementById('bgv'),bgc=bgv.getContext('2d');
+var tips=[];
+function seedVines(){
+  var ww=window.innerWidth,wh=window.innerHeight;
+  tips.length=0;
+  var pts=[
+    {x:-8,y:wh*0.25,a:5},{x:-8,y:wh*0.6,a:-5},{x:-8,y:wh*0.88,a:-20},
+    {x:ww+8,y:wh*0.22,a:175},{x:ww+8,y:wh*0.58,a:185},{x:ww+8,y:wh*0.9,a:200}
+  ];
+  for(var i=0;i<pts.length;i++){
+    var p=pts[i];
+    tips.push({x:p.x,y:p.y,d:p.a+(Math.random()-0.5)*14,life:900+Math.random()*400,depth:0,w:1.05,sway:0});
+  }
+}
+function resetVines(){
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  var ww=window.innerWidth,wh=window.innerHeight;
+  bgv.width=ww*dpr;bgv.height=wh*dpr;
+  bgv.style.width=ww+'px';bgv.style.height=wh+'px';
+  bgc.setTransform(dpr,0,0,dpr,0,0);bgc.clearRect(0,0,ww,wh);
+  bgc.lineCap='round';
+  seedVines();
+}
+function stepVines(){
+  if(!tips.length)return;
+  var ww=window.innerWidth,wh=window.innerHeight;
+  var next=[];
+  // advance many micro-steps per frame so growth feels continuous but still gentle
+  var sub=2;
+  for(var s=0;s<sub;s++){
+    for(var i=0;i<tips.length;i++){
+      var t=tips[i];
+      if(t.life<=0||t.w<0.22)continue;
+      // rare turn impulse — sweeping redirect
+      if(Math.random()<0.008)t.sway+=(Math.random()-0.5)*55;
+      t.sway=t.sway*0.94+(Math.random()-0.5)*3.0;
+      t.d+=t.sway*0.08+(Math.random()-0.5)*0.6;
+      var step=1.6;
+      var rad=t.d*Math.PI/180;
+      var nx=t.x+Math.cos(rad)*step,ny=t.y+Math.sin(rad)*step;
+      var a=0.26+t.depth*0.025;
+      bgc.strokeStyle='rgba(68,38,46,'+a+')';
+      bgc.lineWidth=t.w;
+      bgc.beginPath();bgc.moveTo(t.x,t.y);bgc.lineTo(nx,ny);bgc.stroke();
+      // tiny leaves — small green ellipses along the stem
+      if(Math.random()<0.055&&t.depth<4&&t.w>0.42){
+        var lside=Math.random()<0.5?1:-1;
+        var lperp=rad+Math.PI/2*lside;
+        var lx=nx+Math.cos(lperp)*3.2,ly=ny+Math.sin(lperp)*3.2;
+        var lang=lperp+(Math.random()-0.5)*0.7;
+        var lsc=0.85+Math.random()*0.7;
+        bgc.save();bgc.translate(lx,ly);bgc.rotate(lang);
+        bgc.fillStyle='rgba(92,128,82,'+(0.52+Math.random()*0.22)+')';
+        bgc.beginPath();bgc.ellipse(0,0,4.0*lsc,1.5*lsc,0,0,Math.PI*2);bgc.fill();
+        bgc.restore();
+      }
+      // fine perpendicular hairs — the feathery detail
+      if(Math.random()<0.09&&t.depth<4){
+        var side=Math.random()<0.5?1:-1;
+        var perp=rad+Math.PI/2*side;
+        var hlen=2+Math.random()*5*(1-t.depth*0.15);
+        var bend=(Math.random()-0.5)*0.6;
+        bgc.strokeStyle='rgba(75,48,54,'+(a*0.85)+')';
+        bgc.lineWidth=t.w*0.55;
+        bgc.beginPath();bgc.moveTo(nx,ny);
+        bgc.quadraticCurveTo(
+          nx+Math.cos(perp+bend)*hlen*0.6,ny+Math.sin(perp+bend)*hlen*0.6,
+          nx+Math.cos(perp)*hlen,ny+Math.sin(perp)*hlen
+        );
+        bgc.stroke();
+      }
+      t.x=nx;t.y=ny;t.life--;t.w*=0.9988;
+      // fork occasionally
+      if(t.depth<5&&t.w>0.38){
+        if(Math.random()<0.012){
+          next.push({x:nx,y:ny,d:t.d+20+Math.random()*24,life:t.life*0.55,depth:t.depth+1,w:t.w*0.68,sway:0});
+        }
+        if(Math.random()<0.012){
+          next.push({x:nx,y:ny,d:t.d-20-Math.random()*24,life:t.life*0.55,depth:t.depth+1,w:t.w*0.66,sway:0});
+        }
+      }
+      // kill if wandered offscreen
+      if(nx<-40||nx>ww+40||ny<-40||ny>wh+40)continue;
+      next.push(t);
+    }
+    tips=next;next=[];
+  }
+}
+resetVines();
+window.addEventListener('resize',resetVines);
+
 /* ─── LOOP ─── */
 var lastT=0;
 function frame(t){
   var dt=Math.min((t-lastT)/1000,1/30);lastT=t;
-  stepCloth(dt||DT);updateMesh();render();drawOvl();
+  stepCloth(dt||DT);updateMesh();render();drawOvl();stepVines();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
